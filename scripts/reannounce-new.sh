@@ -61,6 +61,7 @@ for key in INITIAL_DELAY CHECK_INTERVAL; do
     is_decimal "$value" || fail "$key must be a non-negative decimal number"
 done
 [ "$DELUGE_PORT" -ge 1 ] && [ "$DELUGE_PORT" -le 65535 ] || fail "DELUGE_PORT out of range"
+[ "$CONSOLE_TIMEOUT" -ge 1 ] || fail "CONSOLE_TIMEOUT must be at least 1 second"
 awk -v n="$CHECK_INTERVAL" 'BEGIN { exit !(n > 0) }' || fail "CHECK_INTERVAL must be positive"
 command -v "$DELUGE_CONSOLE" >/dev/null 2>&1 || [ -x "$DELUGE_CONSOLE" ] || fail "deluge-console not found: $DELUGE_CONSOLE"
 
