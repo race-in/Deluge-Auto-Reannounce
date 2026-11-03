@@ -10,11 +10,13 @@ A per-user, rootless helper for **Feral Hosting shared slots** running **Deluge 
 
 1. Deluge's Execute plugin fires the **Torrent Added** event.
 2. The wrapper receives the torrent hash, name and download path.
-3. The runner queries `deluge-console` for that torrent's tracker status.
+3. The runner queries `deluge-console` for that torrent's state and tracker status.
 4. It stops immediately if any tracker reports `Announce OK`.
-5. It waits while `Announce Sent` is in flight, then retries only after the response timeout.
-6. For missing/error/non-success status it force-reannounces only that torrent, rate-limited by `REANNOUNCE_INTERVAL`.
-7. It exits on success or after `MAX_RUNTIME`.
+5. It waits while `Announce Sent` is in flight, then waits for `SENT_TIMEOUT` before another attempt.
+6. For a failed announce, it issues `pause HASH`, then `resume HASH` for that exact torrent; attempts are rate-limited by `REANNOUNCE_INTERVAL`.
+7. It does not change a torrent that was already paused, and it defers torrents in queued/checking/other non-active states.
+8. If a resume command fails or its result is ambiguous, recovery takes priority and the runner keeps retrying resume until Deluge confirms the torrent is no longer paused.
+9. It exits on success or after `MAX_RUNTIME` (except that it will not abandon an unresolved resume and leave the torrent paused).
 
 It never selects `*`, never loops over the whole torrent list, and does not alter tracker URLs, torrent data, Deluge preferences or libtorrent settings. A per-torrent lock prevents duplicate runners for the same hash in the same instance.
 
@@ -136,7 +138,11 @@ Changes apply to subsequent torrents; no Deluge restart is needed. Keep retry in
 |---|---|
 | Any `Announce OK` | Stop successfully; do not send more requests |
 | `Announce Sent` | Wait for `SENT_TIMEOUT`; do not reset the wait window on every poll |
-| Empty / unavailable status or RPC error | Do not alter torrent state; retry the status query until timeout |\n| Tracker error / non-success status | Pause then resume that active torrent when the retry interval allows |\n| Torrent already paused | Stop and preserve the user's paused state |\n| Queued / checking / other non-active state | Wait without changing torrent state |\n| Resume failed / ambiguous | Retry resume and verify state before any further announce attempt |
+| Empty / unavailable status or RPC error | Do not alter torrent state; retry the status query until timeout |
+| Tracker error / non-success status | Pause then resume that active torrent when the retry interval allows |
+| Torrent already paused | Stop and preserve the user's paused state |
+| Queued / checking / other non-active state | Wait without changing torrent state |
+| Resume failed / ambiguous | Retry resume and verify state before any further announce attempt |
 | Runtime reached | Stop with timeout exit status |
 
 A torrent may have several trackers. Any reported `Announce OK` is treated as success. The runner checks the Deluge state before acting; only active `Downloading` or `Seeding` torrents are eligible for a Pause → Resume attempt.
@@ -173,7 +179,9 @@ The uninstaller removes this project's runner, wrapper and manual shortcut. It a
 ## Troubleshooting
 
 - **Console not found:** set `DELUGE_CONSOLE=/absolute/path/to/deluge-console` when running the installer.
-- **No event log:** ensure Execute is enabled and the Torrent Added event points to the installed wrapper. Confirm the event entry is loaded by the running daemon; editing `execute.conf` while the daemon is running does not register a new handler until the plugin reloads.\n- **Torrent unexpectedly paused:** inspect `RESUME_FAILED`, `RESUME_RETRY_FAILED` and `RESUME_VERIFY_PENDING` log entries. The runner prioritizes resume recovery over announce timeout to avoid intentionally abandoning a torrent after a pause attempt.\n- **Duplicate event:** the per-hash lock logs `DUPLICATE` and prevents a second runner from operating on the same torrent.
+- **No event log:** ensure Execute is enabled and the Torrent Added event points to the installed wrapper. Confirm the event entry is loaded by the running daemon; editing `execute.conf` while the daemon is running does not register a new handler until the plugin reloads.
+- **Torrent unexpectedly paused:** inspect `RESUME_FAILED`, `RESUME_RETRY_FAILED` and `RESUME_VERIFY_PENDING` log entries. The runner prioritizes resume recovery over announce timeout to avoid intentionally abandoning a torrent after a pause attempt.
+- **Duplicate event:** the per-hash lock logs `DUPLICATE` and prevents a second runner from operating on the same torrent.
 - **RPC registration fails:** use the WebUI manual Execute setup above. Ensure `DELUGE_PYTHON` points to the Python environment with Deluge and Twisted modules.
 - **Wrong daemon port:** check `daemon_port` in `~/.config/deluge/core.conf` and set `DELUGE_PORT` in the project config.
 - **Torrent ID rejected:** Execute must pass Deluge's full 40-character info-hash as argument 1.
