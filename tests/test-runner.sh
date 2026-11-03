@@ -19,7 +19,7 @@ case "$*" in
   *"info -v"*)
     n=0; [ ! -f "$MOCK_STATE" ] || n=$(cat "$MOCK_STATE")
     n=$((n + 1)); printf '%s' "$n" > "$MOCK_STATE"
-    if [ -f "$MOCK_REANNOUNCES" ]; then
+    if [ -f "$MOCK_ANNOUNCES" ]; then
       echo 'Tracker status: mock: Announce OK'
     else
       case "$MOCK_MODE:$n" in
@@ -31,20 +31,25 @@ case "$*" in
       esac
     fi
     ;;
-  *"reannounce "*) echo reannounce >> "$MOCK_REANNOUNCES";;
+  *"pause "*) echo pause >> "$MOCK_ACTIONS";;
+  *"resume "*) echo resume >> "$MOCK_ACTIONS";;
 esac
 MOCK
 chmod +x "$FAKE" "$CLOCK"
 HASH=0123456789abcdef0123456789abcdef01234567
 run_case() {
-  mode=$1; expected=$2; rm -f "$TMP/state" "$TMP/reannounces" "$TMP/log" "$TMP/clock-state"
-  export MOCK_STATE="$TMP/state" MOCK_MODE="$mode" MOCK_REANNOUNCES="$TMP/reannounces" CLOCK_STATE="$TMP/clock-state" MOCK_CALLS="$TMP/calls"
+  mode=$1; expected=$2; rm -f "$TMP/state" "$TMP/actions" "$TMP/log" "$TMP/clock-state"
+  export MOCK_STATE="$TMP/state" MOCK_MODE="$mode" MOCK_ACTIONS="$TMP/actions" MOCK_ANNOUNCES="$TMP/announces" CLOCK_STATE="$TMP/clock-state" MOCK_CALLS="$TMP/calls"
   CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_CONFIG_DIR="$TMP/jerry-config" DELUGE_PORT=58846 \
     NOW_COMMAND="$CLOCK" INITIAL_DELAY=0 CHECK_INTERVAL=0.001 MAX_RUNTIME=300 \
     REANNOUNCE_INTERVAL=30 SENT_TIMEOUT=3 LOG_FILE="$TMP/log" \
     "$RUNNER" "$HASH" Test >/dev/null 2>&1
-  count=0; [ ! -f "$TMP/reannounces" ] || count=$(wc -l < "$TMP/reannounces")
-  [ "$count" -eq "$expected" ] || { echo "$mode: expected $expected reannounces, got $count"; exit 1; }
+  count=0; [ ! -f "$TMP/actions" ] || count=$(wc -l < "$TMP/actions")
+  [ "$count" -eq "$((expected * 2))" ] || { echo "$mode: expected $((expected * 2)) pause/resume actions, got $count"; exit 1; }
+  if [ "$expected" -gt 0 ]; then
+    [ "$(sed -n '1p' "$TMP/actions")" = pause ] && [ "$(sed -n '2p' "$TMP/actions")" = resume ] || { echo "$mode: pause/resume order incorrect"; exit 1; }
+  fi
+  ! grep -q "reannounce " "$TMP/calls" || { echo "$mode: direct reannounce must not be called"; exit 1; }
   grep -F -- "-c $TMP/jerry-config connect 127.0.0.1:58846;" "$TMP/calls" >/dev/null
 }
 run_case ok 0
