@@ -12,7 +12,7 @@ STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/$APP"
 BIN_FILE="$HOME/.local/bin/$BIN_NAME"
 
 if [ "$(id -u)" -eq 0 ]; then echo "Run as your Feral slot user, not root." >&2; exit 1; fi
-printf 'This removes only Deluge Auto Reannounce instance "$INSTANCE". Deluge settings and torrents are untouched.\n'
+printf "This removes only Deluge Auto Reannounce instance \"$INSTANCE\". Deluge settings and torrents are untouched.\n"
 printf 'Remove config and logs too? [y/N] '
 read -r answer
 rm -rf "$APP_DIR" "$BIN_FILE"
