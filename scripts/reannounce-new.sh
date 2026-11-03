@@ -18,7 +18,7 @@ DELUGE_HOST=${DELUGE_HOST:-127.0.0.1}
 DELUGE_PORT=${DELUGE_PORT:-58846}
 INITIAL_DELAY=${INITIAL_DELAY:-0.5}
 CHECK_INTERVAL=${CHECK_INTERVAL:-2}
-MAX_RUNTIME=${MAX_RUNTIME:-0}
+MAX_RUNTIME=${MAX_RUNTIME:-300}
 REANNOUNCE_INTERVAL=${REANNOUNCE_INTERVAL:-30}
 SENT_TIMEOUT=${SENT_TIMEOUT:-15}
 LOG_FILE=${LOG_FILE:-"${HOME:-/tmp}/.local/state/deluge-auto-reannounce/reannounce.log"}
@@ -42,7 +42,7 @@ esac
 [ "${#TORRENT_ID}" -eq 40 ] || fail "Torrent hash must be 40 hexadecimal characters"
 
 is_uint() { case "$1" in ''|*[!0-9]*) return 1;; *) return 0;; esac; }
-for key in DELUGE_PORT REANNOUNCE_INTERVAL SENT_TIMEOUT; do
+for key in DELUGE_PORT MAX_RUNTIME REANNOUNCE_INTERVAL SENT_TIMEOUT; do
     case "$key" in
         DELUGE_PORT) value=$DELUGE_PORT ;;
         MAX_RUNTIME) value=$MAX_RUNTIME ;;
@@ -73,10 +73,26 @@ START_TIME=$(now_seconds)
 LAST_REANNOUNCE=0
 LAST_SENT_REANNOUNCE=0
 ATTEMPT=0
+NEED_RESUME=0
 
 while :; do
     now=$(now_seconds)
     elapsed=$((now - START_TIME))
+
+    # If a resume failed, prioritize restoring torrent activity before any other work.
+    if [ "$NEED_RESUME" -eq 1 ]; then
+        if resume_output=$("$DELUGE_CONSOLE" -c "$DELUGE_CONFIG_DIR" "connect ${DELUGE_HOST}:${DELUGE_PORT}; resume ${TORRENT_ID}" 2>&1); then
+            NEED_RESUME=0
+            LAST_REANNOUNCE=$now
+            LAST_SENT_REANNOUNCE=0
+            log "RESUME_RETRY_OK | $TORRENT_NAME"
+        else
+            log "RESUME_RETRY_FAILED | $resume_output | $TORRENT_NAME"
+            sleep "$CHECK_INTERVAL"
+            continue
+        fi
+    fi
+
     output=$("$DELUGE_CONSOLE" -c "$DELUGE_CONFIG_DIR" "connect ${DELUGE_HOST}:${DELUGE_PORT}; info -v ${TORRENT_ID}" 2>&1) || true
     status=$(printf '%s\n' "$output" | grep -i 'Tracker status:' || true)
     log "CHECK | ${elapsed}s | ${status:-Tracker status unavailable}"
@@ -84,6 +100,11 @@ while :; do
     if printf '%s\n' "$status" | grep -qi 'Announce OK'; then
         log "SUCCESS | Announce OK after ${elapsed}s | Reannounce attempts: $ATTEMPT | $TORRENT_NAME"
         exit 0
+    fi
+
+    if [ "$MAX_RUNTIME" -gt 0 ] && [ "$elapsed" -ge "$MAX_RUNTIME" ]; then
+        log "TIMEOUT | ${elapsed}s | Attempts: $ATTEMPT | $TORRENT_NAME"
+        exit 2
     fi
 
     do_reannounce=0
@@ -106,16 +127,18 @@ while :; do
 
     if [ "$do_reannounce" -eq 1 ]; then
         ATTEMPT=$((ATTEMPT + 1))
-        LAST_REANNOUNCE=$now
         log "PAUSE_RESUME $ATTEMPT | ${elapsed}s | $TORRENT_NAME"
-        if "$DELUGE_CONSOLE" -c "$DELUGE_CONFIG_DIR" "connect ${DELUGE_HOST}:${DELUGE_PORT}; pause ${TORRENT_ID}" >/dev/null 2>&1; then
+        if pause_output=$("$DELUGE_CONSOLE" -c "$DELUGE_CONFIG_DIR" "connect ${DELUGE_HOST}:${DELUGE_PORT}; pause ${TORRENT_ID}" 2>&1); then
             sleep 1
-            if ! "$DELUGE_CONSOLE" -c "$DELUGE_CONFIG_DIR" "connect ${DELUGE_HOST}:${DELUGE_PORT}; resume ${TORRENT_ID}" >/dev/null 2>&1; then
-                log "ERROR | resume command failed | $TORRENT_NAME"
-                exit 1
+            if resume_output=$("$DELUGE_CONSOLE" -c "$DELUGE_CONFIG_DIR" "connect ${DELUGE_HOST}:${DELUGE_PORT}; resume ${TORRENT_ID}" 2>&1); then
+                LAST_REANNOUNCE=$(now_seconds)
+                log "PAUSE_RESUME_OK | $TORRENT_NAME"
+            else
+                NEED_RESUME=1
+                log "RESUME_FAILED | $resume_output | will retry resume | $TORRENT_NAME"
             fi
         else
-            log "WARNING | pause command failed; skipping resume | $TORRENT_NAME"
+            log "PAUSE_FAILED | $pause_output | will retry | $TORRENT_NAME"
         fi
     fi
     sleep "$CHECK_INTERVAL"
