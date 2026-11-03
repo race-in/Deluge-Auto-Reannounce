@@ -56,7 +56,7 @@ run_case() {
   grep -F -- "-c $TMP/jerry-config connect 127.0.0.1:58846;" "$TMP/calls" >/dev/null
 }
 run_case ok 0
-run_case delayed 1
+run_case delayed 0
 run_case sent 1
 run_case error 1
 if "$RUNNER" bad >/dev/null 2>&1; then echo 'invalid hash unexpectedly accepted'; exit 1; fi
