@@ -51,6 +51,10 @@ elif [[ "$*" == *"resume $MOCK_HASH" ]]; then
   if [ "${MOCK_FAIL_RESUME_ONCE:-0}" = 1 ] && [ "$n" -eq 1 ]; then
     echo 'mock resume failure' >&2; exit 1
   fi
+  if [ "${MOCK_STUCK_RESUME_ONCE:-0}" = 1 ] && [ "$n" -eq 1 ]; then
+    echo resume >> "$MOCK_ACTIONS"
+    exit 0
+  fi
   was_paused=0; [ ! -f "$MOCK_PAUSED_MARKER" ] || was_paused=1
   rm -f "$MOCK_PAUSED_MARKER"
   printf '%s\n' Downloading > "$MOCK_TORRENT_STATE_FILE"
@@ -118,6 +122,17 @@ run_failure_case() {
   grep -q 'SUCCESS | Announce OK' "$TMP/log"
   unset MOCK_FAIL_PAUSE_ONCE MOCK_FAIL_RESUME_ONCE
 }
+run_stuck_resume_case() {
+  reset_case error
+  export MOCK_STUCK_RESUME_ONCE=1
+  run_runner
+  [ "$(cat "$TMP/pause-count")" -eq 1 ] || { echo 'pause repeated before resume recovery'; exit 1; }
+  [ "$(cat "$TMP/resume-count")" -ge 2 ] || { echo 'zero-exit but ineffective resume was not retried'; exit 1; }
+  grep -q 'RESUME_VERIFY_PENDING' "$TMP/log" || { echo 'ineffective resume was not detected'; exit 1; }
+  grep -q 'RESUME_RECOVERED' "$TMP/log" || { echo 'resume recovery was not confirmed'; exit 1; }
+  unset MOCK_STUCK_RESUME_ONCE
+}
+
 run_unconfirmed_pause_case() {
   reset_case error
   export MOCK_IGNORE_PAUSE=1
@@ -134,6 +149,7 @@ run_case error 1
 run_paused_case
 run_failure_case pause
 run_failure_case resume
+run_stuck_resume_case
 run_unconfirmed_pause_case
 
 if "$RUNNER" bad >/dev/null 2>&1; then echo 'invalid hash unexpectedly accepted'; exit 1; fi
