@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/race-in/Deluge-Auto-Reannounce/actions/workflows/ci.yml/badge.svg)](https://github.com/race-in/Deluge-Auto-Reannounce/actions/workflows/ci.yml)
 
-A per-user, rootless helper for **Feral Hosting shared slots** running **Deluge 1.3.15**. It watches only a newly added torrent and asks Deluge to force-reannounce that torrent until at least one tracker reports `Announce OK` or the configured time limit is reached.
+A per-user, rootless helper for **Feral Hosting shared slots** running **Deluge 1.3.15**. It watches only a newly added torrent and uses a torrent-specific **Pause → Resume** cycle to trigger a fresh tracker announce. It repeats the cycle at the configured interval until at least one tracker reports `Announce OK` or the configured time limit is reached.
 
 > This edition is designed around Feral-style shared-slot constraints: no root, no sudo, no system package installation, no systemd unit, no global Python/Deluge package modification, and no daemon restart. Project files, config and logs stay under the slot user's home directory.
 
@@ -16,7 +16,7 @@ A per-user, rootless helper for **Feral Hosting shared slots** running **Deluge 
 6. For missing/error/non-success status it force-reannounces only that torrent, rate-limited by `REANNOUNCE_INTERVAL`.
 7. It exits on success or after `MAX_RUNTIME`.
 
-It never selects `*`, never loops over the whole torrent list, and does not alter tracker URLs, torrent data, Deluge preferences or libtorrent settings.
+It never selects `*`, never loops over the whole torrent list, and does not alter tracker URLs, torrent data, Deluge preferences or libtorrent settings. A per-torrent lock prevents duplicate runners for the same hash in the same instance.
 
 ## Target environment
 
@@ -27,7 +27,7 @@ It never selects `*`, never loops over the whole torrent list, and does not alte
 | Python | Deluge's own Python environment; RPC helper supports Python 2/3 syntax |
 | Privileges | Ordinary slot user; do not run as root |
 
-Deluge Console provides `reannounce` as an alias for `update_tracker`; the runner uses that existing command directly. No Deluge package directory is modified.
+The automatic runner uses Deluge's torrent-specific `pause` and `resume` console commands; it does not invoke the global torrent list or edit tracker URLs. No Deluge package directory is modified.
 
 Feral slot layouts and Python environments can differ. The installer detects `deluge-console` in PATH and common user bin paths. It prefers the interpreter in the console's shebang; set `DELUGE_PYTHON` to override this when needed. Deluge 1.3 config files contain a concatenated header and settings object, so the installer extracts `daemon_port` directly rather than parsing the full file as JSON.
 
@@ -136,10 +136,10 @@ Changes apply to subsequent torrents; no Deluge restart is needed. Keep retry in
 |---|---|
 | Any `Announce OK` | Stop successfully; do not send more requests |
 | `Announce Sent` | Wait for `SENT_TIMEOUT`; do not reset the wait window on every poll |
-| Empty / no status / error / other failure | Reannounce if first attempt or retry interval has elapsed |
+| Empty / unavailable status or RPC error | Do not alter torrent state; retry the status query until timeout |\n| Tracker error / non-success status | Pause then resume that active torrent when the retry interval allows |\n| Torrent already paused | Stop and preserve the user's paused state |\n| Queued / checking / other non-active state | Wait without changing torrent state |\n| Resume failed / ambiguous | Retry resume and verify state before any further announce attempt |
 | Runtime reached | Stop with timeout exit status |
 
-A torrent may have several trackers. Any reported `Announce OK` is treated as success.
+A torrent may have several trackers. Any reported `Announce OK` is treated as success. The runner checks the Deluge state before acting; only active `Downloading` or `Seeding` torrents are eligible for a Pause → Resume attempt.
 
 ## Manual commands and logs
 
@@ -173,7 +173,7 @@ The uninstaller removes this project's runner, wrapper and manual shortcut. It a
 ## Troubleshooting
 
 - **Console not found:** set `DELUGE_CONSOLE=/absolute/path/to/deluge-console` when running the installer.
-- **No event log:** ensure Execute is enabled and the Torrent Added event points to the installed wrapper.
+- **No event log:** ensure Execute is enabled and the Torrent Added event points to the installed wrapper. Confirm the event entry is loaded by the running daemon; editing `execute.conf` while the daemon is running does not register a new handler until the plugin reloads.\n- **Torrent unexpectedly paused:** inspect `RESUME_FAILED`, `RESUME_RETRY_FAILED` and `RESUME_VERIFY_PENDING` log entries. The runner prioritizes resume recovery over announce timeout to avoid intentionally abandoning a torrent after a pause attempt.\n- **Duplicate event:** the per-hash lock logs `DUPLICATE` and prevents a second runner from operating on the same torrent.
 - **RPC registration fails:** use the WebUI manual Execute setup above. Ensure `DELUGE_PYTHON` points to the Python environment with Deluge and Twisted modules.
 - **Wrong daemon port:** check `daemon_port` in `~/.config/deluge/core.conf` and set `DELUGE_PORT` in the project config.
 - **Torrent ID rejected:** Execute must pass Deluge's full 40-character info-hash as argument 1.
