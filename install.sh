@@ -121,7 +121,7 @@ cat > "$BIN_FILE" <<EOF2
 set -a
 . "$config"
 set +a
-exec "\$DELUGE_CONSOLE" -c "\$DELUGE_CONFIG_DIR" "connect \$DELUGE_HOST:\$DELUGE_PORT; reannounce \${1:?Usage: $BIN_NAME TORRENT_HASH}"
+exec "$BASE_DIR/execute-reannounce.sh" "\${1:?Usage: $BIN_NAME TORRENT_HASH}" "Manual Reannounce" "$HOME"
 EOF2
 chmod 700 "$BIN_FILE"
 
