@@ -154,7 +154,7 @@ run_unconfirmed_pause_case
 
 if "$RUNNER" bad >/dev/null 2>&1; then echo 'invalid hash unexpectedly accepted'; exit 1; fi
 for setting in 'CHECK_INTERVAL=oops' 'MAX_RUNTIME=oops' 'CONSOLE_TIMEOUT=0' 'DELUGE_PORT=65536'; do
-  if env CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" $setting "$RUNNER" "$HASH" >/dev/null 2>&1; then
+  if env CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" "$setting" "$RUNNER" "$HASH" >/dev/null 2>&1; then
     echo "invalid setting unexpectedly accepted: $setting"; exit 1
   fi
 done
