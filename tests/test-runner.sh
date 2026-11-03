@@ -47,7 +47,10 @@ run_case() {
   count=0; [ ! -f "$TMP/actions" ] || count=$(wc -l < "$TMP/actions")
   [ "$count" -eq "$((expected * 2))" ] || { echo "$mode: expected $((expected * 2)) pause/resume actions, got $count"; exit 1; }
   if [ "$expected" -gt 0 ]; then
-    [ "$(sed -n '1p' "$TMP/actions")" = pause ] && [ "$(sed -n '2p' "$TMP/actions")" = resume ] || { echo "$mode: pause/resume order incorrect"; exit 1; }
+    if [ "$(sed -n '1p' "$TMP/actions")" != pause ] || [ "$(sed -n '2p' "$TMP/actions")" != resume ]; then
+      echo "$mode: pause/resume order incorrect"
+      exit 1
+    fi
   fi
   ! grep -q "reannounce " "$TMP/calls" || { echo "$mode: direct reannounce must not be called"; exit 1; }
   grep -F -- "-c $TMP/jerry-config connect 127.0.0.1:58846;" "$TMP/calls" >/dev/null
