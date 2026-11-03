@@ -5,11 +5,8 @@ set -euo pipefail
 VERSION="1.1.0-feral"
 APP_BASE="deluge-auto-reannounce"
 INSTANCE=${DELUGE_INSTANCE:-default}
-case "$INSTANCE" in
-    default) APP="$APP_BASE"; BIN_NAME="deluge-reannounce" ;;
-    *[!a-z0-9_-]*|"") echo "Invalid DELUGE_INSTANCE" >&2; exit 1 ;;
-    *) APP="${APP_BASE}-${INSTANCE}"; BIN_NAME="deluge-reannounce-${INSTANCE}" ;;
-esac
+if [[ ! "$INSTANCE" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then echo "Invalid DELUGE_INSTANCE" >&2; exit 1; fi
+if [ "$INSTANCE" = default ]; then APP="$APP_BASE"; BIN_NAME="deluge-reannounce"; else APP="${APP_BASE}-${INSTANCE}"; BIN_NAME="deluge-reannounce-${INSTANCE}"; fi
 BASE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/$APP"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/$APP"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/$APP"
@@ -122,7 +119,7 @@ cat > "$BIN_FILE" <<EOF2
 set -a
 . "$config"
 set +a
-exec "\$DELUGE_CONSOLE" -c "\$DELUGE_CONFIG_DIR" "connect \$DELUGE_HOST:\$DELUGE_PORT; reannounce \${1:?Usage: deluge-reannounce TORRENT_HASH}"
+exec "\$DELUGE_CONSOLE" -c "\$DELUGE_CONFIG_DIR" "connect \$DELUGE_HOST:\$DELUGE_PORT; reannounce \${1:?Usage: $BIN_NAME TORRENT_HASH}"
 EOF2
 chmod 700 "$BIN_FILE"
 
