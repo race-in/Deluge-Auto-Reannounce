@@ -150,11 +150,13 @@ A torrent may have several trackers. Any reported `Announce OK` is treated as su
 
 ## Manual commands and logs
 
-Reannounce one torrent:
+Run the Pause → Resume retry workflow for one torrent:
 
 ```bash
 ~/.local/bin/deluge-reannounce TORRENT_HASH
 ```
+
+The manual shortcut uses the same runner as the Torrent Added event; it does not call Deluge's direct `reannounce` command.
 
 Test the event wrapper (the hash must be 40 hexadecimal characters):
 
