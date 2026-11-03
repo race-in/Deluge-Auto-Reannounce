@@ -25,7 +25,8 @@ def credentials():
             import deluge.configmanager
             auth_path = os.path.join(deluge.configmanager.get_config_dir(), "auth")
         except Exception:
-            auth_path = os.path.expanduser("~/.config/deluge/auth")
+            config_dir = os.environ.get("DELUGE_CONFIG_DIR", os.path.expanduser("~/.config/deluge"))
+            auth_path = os.path.join(config_dir, "auth")
         with open(auth_path, "r") as stream:
             for line in stream:
                 fields = line.strip().split(":")
@@ -47,7 +48,7 @@ def main():
         commands = yield client.execute.get_commands()
         found = False
         for item in commands:
-            # Execute command entries are [id, event, command].
+            # Deluge 1.3 Execute entries are [id, event, command].
             if len(item) >= 3 and item[1] == "added" and item[2] == command:
                 found = True
                 break
@@ -70,4 +71,3 @@ sys.exit_code = 1
 reactor.callWhenRunning(main)
 reactor.callLater(25, lambda: (print("Deluge RPC timeout", file=sys.stderr), stop()))
 reactor.run()
-sys.exit(sys.exit_code)

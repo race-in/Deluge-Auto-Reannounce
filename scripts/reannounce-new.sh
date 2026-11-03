@@ -42,15 +42,27 @@ esac
 
 is_uint() { case "$1" in ''|*[!0-9]*) return 1;; *) return 0;; esac; }
 for key in DELUGE_PORT MAX_RUNTIME REANNOUNCE_INTERVAL SENT_TIMEOUT; do
-    eval "value=\${$key}"
+    case "$key" in
+        DELUGE_PORT) value=$DELUGE_PORT ;;
+        MAX_RUNTIME) value=$MAX_RUNTIME ;;
+        REANNOUNCE_INTERVAL) value=$REANNOUNCE_INTERVAL ;;
+        SENT_TIMEOUT) value=$SENT_TIMEOUT ;;
+    esac
     is_uint "$value" || fail "$key must be a non-negative integer"
 done
 for key in INITIAL_DELAY CHECK_INTERVAL; do
-    eval "value=\${$key}"
+    case "$key" in
+        INITIAL_DELAY) value=$INITIAL_DELAY ;;
+        CHECK_INTERVAL) value=$CHECK_INTERVAL ;;
+    esac
     case "$value" in ''|*[!0-9.]*|.*.*) fail "$key must be a non-negative number";; esac
 done
-[ "$DELUGE_PORT" -ge 1 ] && [ "$DELUGE_PORT" -le 65535 ] || fail "DELUGE_PORT out of range"
-[ "$MAX_RUNTIME" -gt 0 ] && [ "$CHECK_INTERVAL" != "0" ] || fail "MAX_RUNTIME and CHECK_INTERVAL must be positive"
+if [ "$DELUGE_PORT" -lt 1 ] || [ "$DELUGE_PORT" -gt 65535 ]; then
+    fail "DELUGE_PORT out of range"
+fi
+if [ "$MAX_RUNTIME" -eq 0 ] || [ "$CHECK_INTERVAL" = "0" ] || [ "$CHECK_INTERVAL" = "0.0" ]; then
+    fail "MAX_RUNTIME and CHECK_INTERVAL must be positive"
+fi
 command -v "$DELUGE_CONSOLE" >/dev/null 2>&1 || [ -x "$DELUGE_CONSOLE" ] || fail "deluge-console not found: $DELUGE_CONSOLE"
 
 log "START | $TORRENT_NAME | $TORRENT_ID"
@@ -77,7 +89,7 @@ while :; do
 
     do_reannounce=0
     if printf '%s\n' "$status" | grep -qi 'Announce Sent'; then
-        # Give an in-flight announce its response window; do not reset this timer on every poll.
+        # Give an in-flight announce its full response window; do not reset this timer on every poll.
         if [ "$LAST_SENT_REANNOUNCE" -eq 0 ]; then
             LAST_SENT_REANNOUNCE=$now
         elif [ $((now - LAST_SENT_REANNOUNCE)) -ge "$SENT_TIMEOUT" ]; then

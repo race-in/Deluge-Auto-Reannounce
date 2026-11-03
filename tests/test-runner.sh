@@ -48,10 +48,11 @@ run_case() {
 run_case ok 0
 run_case delayed 0
 run_case sent 1
+run_case error 1
 if "$RUNNER" bad >/dev/null 2>&1; then echo 'invalid hash unexpectedly accepted'; exit 1; fi
 if CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_PORT=58846 MAX_RUNTIME=oops "$RUNNER" "$HASH" >/dev/null 2>&1; then
   echo 'invalid runtime unexpectedly accepted'; exit 1
 fi
-bash -n "$RUNNER" "$ROOT/install.sh" "$ROOT/uninstall.sh"
+bash -n "$RUNNER" "$ROOT/install.sh" "$ROOT/uninstall.sh" "$ROOT/tests/test-installer.sh"
 python -m py_compile "$ROOT/scripts/configure-execute.py"
 echo 'runner mock tests passed'
