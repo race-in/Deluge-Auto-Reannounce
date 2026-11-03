@@ -19,7 +19,7 @@ case "$*" in
   *"info -v"*)
     n=0; [ ! -f "$MOCK_STATE" ] || n=$(cat "$MOCK_STATE")
     n=$((n + 1)); printf '%s' "$n" > "$MOCK_STATE"
-    echo 'State: Downloading'
+    echo "State: ${MOCK_TORRENT_STATE:-Downloading}"
     if [ -f "$MOCK_ANNOUNCES" ]; then
       echo 'Tracker status: mock: Announce OK'
     else
@@ -98,10 +98,24 @@ run_failure_retry_case() {
   grep -q 'SUCCESS | Announce OK' "$TMP/log"
   unset MOCK_FAIL_PAUSE_ONCE MOCK_FAIL_RESUME_ONCE
 }
+run_paused_case() {
+  rm -f "$TMP/state" "$TMP/actions" "$TMP/announces" "$TMP/log" "$TMP/clock-state" "$TMP/pause-attempts" "$TMP/resume-attempts"
+  export MOCK_STATE="$TMP/state" MOCK_MODE=error MOCK_ACTIONS="$TMP/actions" MOCK_ANNOUNCES="$TMP/announces"
+  export MOCK_PAUSE_ATTEMPTS="$TMP/pause-attempts" MOCK_RESUME_ATTEMPTS="$TMP/resume-attempts"
+  export CLOCK_STATE="$TMP/clock-state" MOCK_CALLS="$TMP/calls" MOCK_TORRENT_STATE=Paused
+  CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_CONFIG_DIR="$TMP/jerry-config" DELUGE_PORT=58846 \\
+    NOW_COMMAND="$CLOCK" INITIAL_DELAY=0 CHECK_INTERVAL=0.001 MAX_RUNTIME=300 \\
+    REANNOUNCE_INTERVAL=30 SENT_TIMEOUT=3 LOG_FILE="$TMP/log" \\
+    "$RUNNER" "$HASH" Test >/dev/null 2>&1
+  [ ! -s "$TMP/actions" ] || { echo 'paused torrent was modified'; exit 1; }
+  grep -q 'SKIPPED | Torrent was already paused' "$TMP/log"
+  unset MOCK_TORRENT_STATE
+}
 run_case ok 0
 run_case delayed 0
 run_case sent 1
 run_case error 1
+run_paused_case
 run_failure_retry_case pause
 run_failure_retry_case resume
 if "$RUNNER" bad >/dev/null 2>&1; then echo 'invalid hash unexpectedly accepted'; exit 1; fi
