@@ -55,7 +55,7 @@ elif [[ "$*" == *"resume $MOCK_HASH" ]]; then
   rm -f "$MOCK_PAUSED_MARKER"
   printf '%s\n' Downloading > "$MOCK_TORRENT_STATE_FILE"
   echo resume >> "$MOCK_ACTIONS"
-  if [ "$was_paused" -eq 1 ] && [ "$MOCK_MODE" != sent ]; then : > "$MOCK_ANNOUNCED"; fi
+  if [ "$was_paused" -eq 1 ]; then : > "$MOCK_ANNOUNCED"; fi
 else
   echo "unexpected mock command: $*" >&2; exit 90
 fi
