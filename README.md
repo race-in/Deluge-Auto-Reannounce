@@ -12,7 +12,7 @@ A per-user, rootless helper for **Feral Hosting shared slots** running **Deluge 
 2. The wrapper receives the torrent hash, name and download path.
 3. The runner queries `deluge-console` for that torrent's state and tracker status.
 4. It stops immediately if any tracker reports `Announce OK`.
-5. It waits while `Announce Sent` is in flight, then waits for `SENT_TIMEOUT` before another attempt.
+5. It polls tracker status every `CHECK_INTERVAL` seconds. While `Announce Sent` is reported, it gives the in-flight announce `SENT_TIMEOUT` seconds to complete before retrying; it does not interrupt a pending response.
 6. For a failed announce, it issues `pause HASH`, then `resume HASH` for that exact torrent; attempts are rate-limited by `REANNOUNCE_INTERVAL`.
 7. It does not change a torrent that was already paused, and it defers torrents in queued/checking/other non-active states.
 8. If a resume command fails or its result is ambiguous, recovery takes priority and the runner keeps retrying resume until Deluge confirms the torrent is no longer paused.
@@ -120,10 +120,10 @@ Use the actual home path printed by the installer. Add the command exactly as sh
 | `DELUGE_PORT` | detected / `58846` | Deluge daemon port |
 | `INITIAL_DELAY` | `0.5` | Delay after torrent-added event |
 | `CHECK_INTERVAL` | `2` | Tracker status poll interval (seconds) |
-| `REANNOUNCE_INTERVAL` | `30` | Minimum seconds between reannounce requests |
-| `SENT_TIMEOUT` | `15` | Wait for in-flight announce response |
+| `REANNOUNCE_INTERVAL` | `15` | Minimum seconds between reannounce requests after no successful response |
+| `SENT_TIMEOUT` | `20` | Wait for an in-flight announce response before retrying |
 | `CONSOLE_TIMEOUT` | `20` | Maximum seconds for one Deluge Console RPC command when GNU `timeout` is available |
-| `MAX_RUNTIME` | `300` | Maximum run time (seconds); `0` disables the runtime limit |
+| `MAX_RUNTIME` | `900` | Maximum run time (15 minutes); `0` disables the runtime limit |
 
 Edit:
 
@@ -131,14 +131,14 @@ Edit:
 nano ~/.config/deluge-auto-reannounce/reannounce.conf
 ```
 
-Changes apply to subsequent torrents; no Deluge restart is needed. Keep retry intervals respectful of tracker announce rules. The default is 30 seconds; do not lower it unless you have verified the tracker's policy.
+Changes apply to subsequent torrents; no Deluge restart is needed. The defaults allow up to 15 minutes for slower trackers, check status every 2 seconds, wait up to 20 seconds for an in-flight response, and retry a non-successful announce every 15 seconds. Tracker announce rules still apply: use a shorter retry interval only where the tracker permits it.
 
 ## Status decisions
 
 | Observed status | Action |
 |---|---|
 | Any `Announce OK` | Stop successfully; do not send more requests |
-| `Announce Sent` | Wait for `SENT_TIMEOUT`; do not reset the wait window on every poll |
+| `Announce Sent` | Wait for `SENT_TIMEOUT` for the pending response; retry only if it remains unresolved |
 | Empty / unavailable status or RPC error | Do not alter torrent state; retry the status query until timeout |
 | Tracker error / non-success status | Pause then resume that active torrent when the retry interval allows |
 | Torrent already paused | Stop and preserve the user's paused state |
