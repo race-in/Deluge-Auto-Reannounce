@@ -123,7 +123,7 @@ Use the actual home path printed by the installer. Add the command exactly as sh
 | `REANNOUNCE_INTERVAL` | `30` | Minimum seconds between reannounce requests |
 | `SENT_TIMEOUT` | `15` | Wait for in-flight announce response |
 | `CONSOLE_TIMEOUT` | `20` | Maximum seconds for one Deluge Console RPC command when GNU `timeout` is available |
-| `MAX_RUNTIME` | `300` | Maximum run time (seconds) |
+| `MAX_RUNTIME` | `300` | Maximum run time (seconds); `0` disables the runtime limit |
 
 Edit:
 
