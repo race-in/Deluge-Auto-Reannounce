@@ -63,7 +63,7 @@ MOCK
 chmod +x "$FAKE" "$CLOCK"
 
 reset_case() {
-  rm -f "$TMP"/*
+  rm -f "$TMP/torrent-state" "$TMP/announced" "$TMP/actions" "$TMP/paused-marker" "$TMP/pause-count" "$TMP/resume-count" "$TMP/info-count" "$TMP/calls" "$TMP/clock-state" "$TMP/log"
   printf '%s\n' Downloading > "$TMP/torrent-state"
   export MOCK_HASH="$HASH" MOCK_MODE="$1"
   export MOCK_TORRENT_STATE_FILE="$TMP/torrent-state"
