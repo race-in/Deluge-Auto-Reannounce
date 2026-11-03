@@ -2,12 +2,19 @@
 # Rootless installer for Feral Hosting / Deluge 1.3.15 shared slots.
 set -euo pipefail
 
-VERSION="1.0.0-feral"
-APP="deluge-auto-reannounce"
+VERSION="1.1.0-feral"
+APP_BASE="deluge-auto-reannounce"
+INSTANCE=${DELUGE_INSTANCE:-default}
+case "$INSTANCE" in
+    default) APP="$APP_BASE"; BIN_NAME="deluge-reannounce" ;;
+    *[!a-z0-9_-]*|"") echo "Invalid DELUGE_INSTANCE" >&2; exit 1 ;;
+    *) APP="${APP_BASE}-${INSTANCE}"; BIN_NAME="deluge-reannounce-${INSTANCE}" ;;
+esac
 BASE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/$APP"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/$APP"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/$APP"
 BIN_DIR="${HOME}/.local/bin"
+BIN_FILE="$BIN_DIR/$BIN_NAME"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 say(){ printf '[%s] %s\n' "$1" "$2"; }
@@ -106,7 +113,7 @@ EOF2
 chmod 700 "$BASE_DIR/execute-reannounce.sh"
 
 # Manual shortcut, limited to the single supplied torrent hash.
-cat > "$BIN_DIR/deluge-reannounce" <<EOF2
+cat > "$BIN_FILE" <<EOF2
 #!/usr/bin/env bash
 set -a
 . "$config"
@@ -127,7 +134,7 @@ fi
 
 echo
 say OK "Feral rootless installation complete ($VERSION)"
-printf 'Deluge console : %s\nDaemon         : 127.0.0.1:%s\nInstall dir    : %s\nConfig         : %s\nLog            : %s/reannounce.log\nExecute wrapper: %s/execute-reannounce.sh\n' "$CONSOLE" "$PORT" "$BASE_DIR" "$config" "$STATE_DIR" "$BASE_DIR"
+printf 'Instance       : %s\nDeluge console : %s\nDaemon         : %s:%s\nInstall dir    : %s\nConfig         : %s\nLog            : %s/reannounce.log\nExecute wrapper: %s/execute-reannounce.sh\nManual command : %s\n' "$INSTANCE" "$CONSOLE" "${DELUGE_HOST:-127.0.0.1}" "$PORT" "$BASE_DIR" "$config" "$STATE_DIR" "$BASE_DIR" "$BIN_FILE"
 printf '\nAdd this in Deluge WebUI: Preferences → Execute → Torrent Added → %s/execute-reannounce.sh\n' "$BASE_DIR"
 printf 'Python used for detection/RPC: %s\n' "$PYTHON_BIN"
 printf 'Ensure ~/.local/bin is in PATH for deluge-reannounce.\n'
