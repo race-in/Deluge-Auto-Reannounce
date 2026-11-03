@@ -103,9 +103,9 @@ run_paused_case() {
   export MOCK_STATE="$TMP/state" MOCK_MODE=error MOCK_ACTIONS="$TMP/actions" MOCK_ANNOUNCES="$TMP/announces"
   export MOCK_PAUSE_ATTEMPTS="$TMP/pause-attempts" MOCK_RESUME_ATTEMPTS="$TMP/resume-attempts"
   export CLOCK_STATE="$TMP/clock-state" MOCK_CALLS="$TMP/calls" MOCK_TORRENT_STATE=Paused
-  CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_CONFIG_DIR="$TMP/jerry-config" DELUGE_PORT=58846 \\
-    NOW_COMMAND="$CLOCK" INITIAL_DELAY=0 CHECK_INTERVAL=0.001 MAX_RUNTIME=300 \\
-    REANNOUNCE_INTERVAL=30 SENT_TIMEOUT=3 LOG_FILE="$TMP/log" \\
+  CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_CONFIG_DIR="$TMP/jerry-config" DELUGE_PORT=58846 \
+    NOW_COMMAND="$CLOCK" INITIAL_DELAY=0 CHECK_INTERVAL=0.001 MAX_RUNTIME=300 \
+    REANNOUNCE_INTERVAL=30 SENT_TIMEOUT=3 LOG_FILE="$TMP/log" \
     "$RUNNER" "$HASH" Test >/dev/null 2>&1
   [ ! -s "$TMP/actions" ] || { echo 'paused torrent was modified'; exit 1; }
   grep -q 'SKIPPED | Torrent was already paused' "$TMP/log"
