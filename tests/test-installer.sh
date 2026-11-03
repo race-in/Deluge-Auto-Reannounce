@@ -59,12 +59,10 @@ JERRY_CFG="$HOME_DIR/.config/deluge-auto-reannounce-jerry/reannounce.conf"
 [ -x "$JERRY_APP/reannounce-new.sh" ]
 [ -x "$JERRY_APP/execute-reannounce.sh" ]
 [ -x "$HOME_DIR/.local/bin/deluge-reannounce-jerry" ]
-grep -q '^DELUGE_PORT="28602"
- "$JERRY_CFG"
+grep -q '^DELUGE_PORT="28602"$' "$JERRY_CFG"
 grep -q '^DELUGE_CONFIG_DIR=' "$JERRY_CFG"
 grep -q 'deluge-auto-reannounce-jerry/execute-reannounce.sh' "$TMP/jerry-install.log"
-grep -q '^DELUGE_PORT="31851"
- "$CFG"
+grep -q '^DELUGE_PORT="31851"$' "$CFG"
 [ -x "$HOME_DIR/.local/bin/deluge-reannounce" ]
 if HOME="$HOME_DIR" XDG_CONFIG_HOME="$HOME_DIR/.config" XDG_DATA_HOME="$HOME_DIR/.local/share" XDG_STATE_HOME="$HOME_DIR/.local/state" PATH="$MOCK_BIN:$PATH" DELUGE_CONSOLE="$HOME_DIR/bin/deluge-console" DELUGE_PYTHON="$(command -v python3)" DELUGE_INSTANCE="../bad" bash "$ROOT/install.sh" >/dev/null 2>&1; then
     echo "installer unexpectedly accepted invalid instance name"; exit 1
