@@ -63,7 +63,8 @@ case "$VERSION_TEXT" in *1.3.15*) ;; *) say WARNING "Expected Deluge 1.3.15; det
 
 # Deluge 1.3 writes a concatenated header+config JSON document, so parse
 # daemon_port as a scalar instead of passing the whole file to json.load().
-CORE_CONF="${DELUGE_CONFIG_DIR:-$HOME/.config/deluge}/core.conf"
+DELUGE_CONFIG_DIR_RESOLVED="${DELUGE_CONFIG_DIR:-$HOME/.config/deluge}"
+CORE_CONF="$DELUGE_CONFIG_DIR_RESOLVED/core.conf"
 PORT=${DELUGE_PORT:-}
 if [ -z "$PORT" ] && [ -r "$CORE_CONF" ]; then
     PORT=$(sed -n 's/^[[:space:]]*"daemon_port"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$CORE_CONF" | head -n 1 || true)
@@ -85,6 +86,7 @@ config="$CONFIG_DIR/reannounce.conf"
 if [ ! -e "$config" ]; then
 cat > "$config" <<EOF2
 DELUGE_CONSOLE="$CONSOLE"
+DELUGE_CONFIG_DIR="$DELUGE_CONFIG_DIR_RESOLVED"
 DELUGE_HOST="${DELUGE_HOST:-127.0.0.1}"
 DELUGE_PORT="$PORT"
 INITIAL_DELAY="${INITIAL_DELAY:-0.5}"
@@ -97,7 +99,9 @@ EOF2
 else
     cp "$config" "$config.backup.$(date +%Y%m%d-%H%M%S)"
     # Keep existing config; add the console path only if not present.
-    grep -q '^DELUGE_CONSOLE=' "$config" || printf '\nDELUGE_CONSOLE="%s"\n' "$CONSOLE" >> "$config"
+    sed -i "s|^DELUGE_CONSOLE=.*|DELUGE_CONSOLE=\"$CONSOLE\"|" "$config"
+    sed -i "s|^DELUGE_PORT=.*|DELUGE_PORT=\"$PORT\"|" "$config"
+    if grep -q '^DELUGE_CONFIG_DIR=' "$config"; then sed -i "s|^DELUGE_CONFIG_DIR=.*|DELUGE_CONFIG_DIR=\"$DELUGE_CONFIG_DIR_RESOLVED\"|" "$config"; else printf '\nDELUGE_CONFIG_DIR="%s"\n' "$DELUGE_CONFIG_DIR_RESOLVED" >> "$config"; fi
 fi
 chmod 600 "$config"
 
@@ -118,14 +122,14 @@ cat > "$BIN_FILE" <<EOF2
 set -a
 . "$config"
 set +a
-exec "\$DELUGE_CONSOLE" "connect \$DELUGE_HOST:\$DELUGE_PORT; reannounce \${1:?Usage: deluge-reannounce TORRENT_HASH}"
+exec "\$DELUGE_CONSOLE" -c "\$DELUGE_CONFIG_DIR" "connect \$DELUGE_HOST:\$DELUGE_PORT; reannounce \${1:?Usage: deluge-reannounce TORRENT_HASH}"
 EOF2
-chmod 700 "$BIN_DIR/deluge-reannounce"
+chmod 700 "$BIN_FILE"
 
 # Best-effort RPC registration with the same Python interpreter as Deluge.
 # Never edit execute.conf behind the daemon or restart/toggle the plugin.
 if "$PYTHON_BIN" -c 'import deluge.ui.client, twisted.internet' >/dev/null 2>&1; then
-    if ! DELUGE_HOST="${DELUGE_HOST:-127.0.0.1}" DELUGE_CONFIG_DIR="${DELUGE_CONFIG_DIR:-$HOME/.config/deluge}" "$PYTHON_BIN" "$SOURCE_DIR/scripts/configure-execute.py" "$PORT" "$BASE_DIR/execute-reannounce.sh"; then
+    if ! DELUGE_HOST="${DELUGE_HOST:-127.0.0.1}" DELUGE_CONFIG_DIR="$DELUGE_CONFIG_DIR_RESOLVED" "$PYTHON_BIN" "$SOURCE_DIR/scripts/configure-execute.py" "$PORT" "$BASE_DIR/execute-reannounce.sh"; then
         say WARNING "Automatic Execute RPC registration failed. Add Torrent Added event manually (see README)."
     fi
 else
