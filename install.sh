@@ -108,6 +108,8 @@ install -m 755 "$SOURCE_DIR/scripts/reannounce-new.sh" "$BASE_DIR/reannounce-new
 
 cat > "$BASE_DIR/execute-reannounce.sh" <<EOF2
 #!/usr/bin/env bash
+CONFIG_FILE="$config"
+export CONFIG_FILE
 set -a
 . "$config"
 set +a
