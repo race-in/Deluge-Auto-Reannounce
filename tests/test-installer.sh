@@ -72,7 +72,7 @@ JERRY_CFG="$HOME_DIR/.config/deluge-auto-reannounce-jerry/reannounce.conf"
 [ -x "$JERRY_APP/execute-reannounce.sh" ]
 [ -x "$HOME_DIR/.local/bin/deluge-reannounce-jerry" ]
 grep -q '^DELUGE_PORT="28602"$' "$JERRY_CFG"
-grep -Fq -- "DELUGE_CONFIG_DIR="$HOME_DIR/.config/deluge-jerry"" "$JERRY_CFG"
+grep -Fq -- "DELUGE_CONFIG_DIR=\"$HOME_DIR/.config/deluge-jerry\"" "$JERRY_CFG"
 grep -Fq -- "execute-reannounce.sh" "$HOME_DIR/.local/bin/deluge-reannounce-jerry"
 grep -q 'deluge-auto-reannounce-jerry/execute-reannounce.sh' "$TMP/jerry-install.log"
 grep -q '^DELUGE_PORT="31851"$' "$CFG"
