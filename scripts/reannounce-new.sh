@@ -205,9 +205,15 @@ while :; do
         log "PAUSE_RESUME $ATTEMPT | ${elapsed}s | $TORRENT_NAME"
         pause_output=$(run_console "pause ${TORRENT_ID}")
         pause_rc=$?
-        # Always attempt resume after a pause command was sent. The pause may
-        # have reached the daemon even if the console reported an error.
+        # Verify the daemon actually paused this exact torrent. Regardless of
+        # the result, always issue resume: the pause may have reached Deluge
+        # even when the console returned an error or timed out.
         sleep 1
+        get_info
+        pause_confirmed=0
+        if [ "$INFO_RC" -eq 0 ] && [ "$INFO_STATE" = "Paused" ]; then
+            pause_confirmed=1
+        fi
         resume_output=$(run_console "resume ${TORRENT_ID}")
         resume_rc=$?
         if [ "$resume_rc" -eq 0 ]; then
@@ -215,10 +221,10 @@ while :; do
             if [ "$INFO_RC" -eq 0 ] && [ -n "$INFO_STATE" ] && [ "$INFO_STATE" != "Paused" ]; then
                 LAST_REANNOUNCE=$(now_seconds)
                 LAST_SENT_REANNOUNCE=0
-                if [ "$pause_rc" -eq 0 ]; then
+                if [ "$pause_confirmed" -eq 1 ]; then
                     log "PAUSE_RESUME_OK | State: $INFO_STATE | $TORRENT_NAME"
                 else
-                    log "PAUSE_FAILED_BUT_RESUMED | pause=$pause_output | State: $INFO_STATE | $TORRENT_NAME"
+                    log "PAUSE_NOT_CONFIRMED_BUT_RESUMED | pause_rc=$pause_rc pause_state=${INFO_STATE:-unknown} pause=$pause_output | State: $INFO_STATE | $TORRENT_NAME"
                 fi
             else
                 NEED_RESUME=1
