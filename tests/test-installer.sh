@@ -40,6 +40,7 @@ CFG="$HOME_DIR/.config/deluge-auto-reannounce/reannounce.conf"
 grep -q '^DELUGE_PORT="31851"$' "$CFG"
 grep -q 'Torrent Added' "$TMP/install.log"
 [ ! -e "$HOME_DIR/.config/deluge/execute.conf" ]
+grep -Fq -- '-c "$DELUGE_CONFIG_DIR"' "$HOME_DIR/.local/bin/deluge-reannounce"
 [ "$(stat -c '%a' "$CFG")" = 600 ]
 sed -i 's/^CHECK_INTERVAL="2"$/CHECK_INTERVAL="7"/' "$CFG"
 HOME="$HOME_DIR" XDG_CONFIG_HOME="$HOME_DIR/.config" XDG_DATA_HOME="$HOME_DIR/.local/share" XDG_STATE_HOME="$HOME_DIR/.local/state" PATH="$MOCK_BIN:$PATH" DELUGE_CONSOLE="$HOME_DIR/bin/deluge-console" DELUGE_PYTHON="$(command -v python3)" bash "$ROOT/install.sh" > "$TMP/upgrade.log" 2>&1
@@ -60,12 +61,16 @@ JERRY_CFG="$HOME_DIR/.config/deluge-auto-reannounce-jerry/reannounce.conf"
 [ -x "$JERRY_APP/execute-reannounce.sh" ]
 [ -x "$HOME_DIR/.local/bin/deluge-reannounce-jerry" ]
 grep -q '^DELUGE_PORT="28602"$' "$JERRY_CFG"
-grep -q '^DELUGE_CONFIG_DIR=' "$JERRY_CFG"
+grep -Fq -- "DELUGE_CONFIG_DIR=\"$HOME_DIR/.config/deluge-jerry\"" "$JERRY_CFG"
+grep -Fq -- '-c "$DELUGE_CONFIG_DIR"' "$HOME_DIR/.local/bin/deluge-reannounce-jerry"
 grep -q 'deluge-auto-reannounce-jerry/execute-reannounce.sh' "$TMP/jerry-install.log"
 grep -q '^DELUGE_PORT="31851"$' "$CFG"
 [ -x "$HOME_DIR/.local/bin/deluge-reannounce" ]
 if HOME="$HOME_DIR" XDG_CONFIG_HOME="$HOME_DIR/.config" XDG_DATA_HOME="$HOME_DIR/.local/share" XDG_STATE_HOME="$HOME_DIR/.local/state" PATH="$MOCK_BIN:$PATH" DELUGE_CONSOLE="$HOME_DIR/bin/deluge-console" DELUGE_PYTHON="$(command -v python3)" DELUGE_INSTANCE="../bad" bash "$ROOT/install.sh" >/dev/null 2>&1; then
     echo "installer unexpectedly accepted invalid instance name"; exit 1
+fi
+if HOME="$HOME_DIR" PATH="$MOCK_BIN:$PATH" DELUGE_INSTANCE="--bad" bash "$ROOT/install.sh" >/dev/null 2>&1; then
+    echo "installer unexpectedly accepted a leading dash in instance name"; exit 1
 fi
 
 echo 'rootless multi-instance installer mock test passed'
