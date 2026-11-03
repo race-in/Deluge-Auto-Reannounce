@@ -23,6 +23,7 @@ CHECK_INTERVAL=${CHECK_INTERVAL:-2}
 MAX_RUNTIME=${MAX_RUNTIME:-300}
 REANNOUNCE_INTERVAL=${REANNOUNCE_INTERVAL:-30}
 SENT_TIMEOUT=${SENT_TIMEOUT:-15}
+CONSOLE_TIMEOUT=${CONSOLE_TIMEOUT:-20}
 LOG_FILE=${LOG_FILE:-"${HOME:-/tmp}/.local/state/deluge-auto-reannounce/reannounce.log"}
 LOCK_ROOT=${LOCK_ROOT:-"${LOG_FILE%/*}/locks"}
 
@@ -42,12 +43,13 @@ case "$TORRENT_ID" in
 esac
 [ "${#TORRENT_ID}" -eq 40 ] || fail "Torrent hash must be 40 hexadecimal characters"
 
-for key in DELUGE_PORT MAX_RUNTIME REANNOUNCE_INTERVAL SENT_TIMEOUT; do
+for key in DELUGE_PORT MAX_RUNTIME REANNOUNCE_INTERVAL SENT_TIMEOUT CONSOLE_TIMEOUT; do
     case "$key" in
         DELUGE_PORT) value=$DELUGE_PORT ;;
         MAX_RUNTIME) value=$MAX_RUNTIME ;;
         REANNOUNCE_INTERVAL) value=$REANNOUNCE_INTERVAL ;;
         SENT_TIMEOUT) value=$SENT_TIMEOUT ;;
+        CONSOLE_TIMEOUT) value=$CONSOLE_TIMEOUT ;;
     esac
     is_uint "$value" || fail "$key must be a non-negative integer"
 done
@@ -85,7 +87,11 @@ trap 'exit 143' TERM
 trap 'exit 129' HUP
 
 run_console() {
-    "$DELUGE_CONSOLE" -c "$DELUGE_CONFIG_DIR" "connect ${DELUGE_HOST}:${DELUGE_PORT}; $1" 2>&1
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "${CONSOLE_TIMEOUT}s" "$DELUGE_CONSOLE" -c "$DELUGE_CONFIG_DIR" "connect ${DELUGE_HOST}:${DELUGE_PORT}; $1" 2>&1
+    else
+        "$DELUGE_CONSOLE" -c "$DELUGE_CONFIG_DIR" "connect ${DELUGE_HOST}:${DELUGE_PORT}; $1" 2>&1
+    fi
 }
 get_info() {
     INFO_OUTPUT=$(run_console "info -v ${TORRENT_ID}")
