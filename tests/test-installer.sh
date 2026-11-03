@@ -38,13 +38,24 @@ CFG="$HOME_DIR/.config/deluge-auto-reannounce/reannounce.conf"
 [ -x "$HOME_DIR/.local/bin/deluge-reannounce" ]
 [ -f "$CFG" ]
 grep -q '^DELUGE_PORT="31851"$' "$CFG"
+grep -q '^CHECK_INTERVAL="1"$' "$CFG"
+grep -q '^MAX_RUNTIME="900"$' "$CFG"
+grep -q '^REANNOUNCE_INTERVAL="15"$' "$CFG"
+grep -q '^SENT_TIMEOUT="20"$' "$CFG"
 grep -q 'Torrent Added' "$TMP/install.log"
 [ ! -e "$HOME_DIR/.config/deluge/execute.conf" ]
 grep -Fq -- "execute-reannounce.sh" "$HOME_DIR/.local/bin/deluge-reannounce"
 [ "$(stat -c '%a' "$CFG")" = 600 ]
-sed -i 's/^CHECK_INTERVAL="2"$/CHECK_INTERVAL="7"/' "$CFG"
+# Simulate an older default config and verify only untouched defaults migrate.
+sed -i 's/^CHECK_INTERVAL="1"$/CHECK_INTERVAL="7"/' "$CFG"
+sed -i 's/^MAX_RUNTIME="900"$/MAX_RUNTIME="300"/' "$CFG"
+sed -i 's/^REANNOUNCE_INTERVAL="15"$/REANNOUNCE_INTERVAL="30"/' "$CFG"
+sed -i 's/^SENT_TIMEOUT="20"$/SENT_TIMEOUT="15"/' "$CFG"
 HOME="$HOME_DIR" XDG_CONFIG_HOME="$HOME_DIR/.config" XDG_DATA_HOME="$HOME_DIR/.local/share" XDG_STATE_HOME="$HOME_DIR/.local/state" PATH="$MOCK_BIN:$PATH" DELUGE_CONSOLE="$HOME_DIR/bin/deluge-console" DELUGE_PYTHON="$(command -v python3)" bash "$ROOT/install.sh" > "$TMP/upgrade.log" 2>&1
 grep -q '^CHECK_INTERVAL="7"$' "$CFG"
+grep -q '^MAX_RUNTIME="900"$' "$CFG"
+grep -q '^REANNOUNCE_INTERVAL="15"$' "$CFG"
+grep -q '^SENT_TIMEOUT="20"$' "$CFG"
 [ -f "$(find "$(dirname "$CFG")" -name 'reannounce.conf.backup.*' -print -quit)" ]
 
 cat > "$HOME_DIR/.config/deluge-jerry/core.conf" <<'CORE'
