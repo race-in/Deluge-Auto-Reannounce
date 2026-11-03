@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 INSTANCE=${DELUGE_INSTANCE:-default}
-case "$INSTANCE" in
-    default) APP="deluge-auto-reannounce"; BIN_NAME="deluge-reannounce" ;;
-    *[!a-z0-9_-]*|"") echo "Invalid DELUGE_INSTANCE" >&2; exit 1 ;;
-    *) APP="deluge-auto-reannounce-$INSTANCE"; BIN_NAME="deluge-reannounce-$INSTANCE" ;;
-esac
+if [[ ! "$INSTANCE" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then echo "Invalid DELUGE_INSTANCE" >&2; exit 1; fi
+if [ "$INSTANCE" = default ]; then APP="deluge-auto-reannounce"; BIN_NAME="deluge-reannounce"; else APP="deluge-auto-reannounce-$INSTANCE"; BIN_NAME="deluge-reannounce-$INSTANCE"; fi
 APP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/$APP"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/$APP"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/$APP"
