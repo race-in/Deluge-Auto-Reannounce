@@ -211,6 +211,7 @@ while :; do
         sleep 1
         get_info
         pause_confirmed=0
+        PAUSE_STATE=${INFO_STATE:-unknown}
         if [ "$INFO_RC" -eq 0 ] && [ "$INFO_STATE" = "Paused" ]; then
             pause_confirmed=1
         fi
@@ -224,7 +225,7 @@ while :; do
                 if [ "$pause_confirmed" -eq 1 ]; then
                     log "PAUSE_RESUME_OK | State: $INFO_STATE | $TORRENT_NAME"
                 else
-                    log "PAUSE_NOT_CONFIRMED_BUT_RESUMED | pause_rc=$pause_rc pause_state=${INFO_STATE:-unknown} pause=$pause_output | State: $INFO_STATE | $TORRENT_NAME"
+                    log "PAUSE_NOT_CONFIRMED_BUT_RESUMED | pause_rc=$pause_rc pause_state=$PAUSE_STATE pause=$pause_output | State: $INFO_STATE | $TORRENT_NAME"
                 fi
             else
                 NEED_RESUME=1
