@@ -127,6 +127,7 @@ while :; do
 
     if [ "$do_reannounce" -eq 1 ]; then
         ATTEMPT=$((ATTEMPT + 1))
+        LAST_REANNOUNCE=$now
         log "PAUSE_RESUME $ATTEMPT | ${elapsed}s | $TORRENT_NAME"
         if pause_output=$("$DELUGE_CONSOLE" -c "$DELUGE_CONFIG_DIR" "connect ${DELUGE_HOST}:${DELUGE_PORT}; pause ${TORRENT_ID}" 2>&1); then
             sleep 1
