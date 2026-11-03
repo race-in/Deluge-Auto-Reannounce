@@ -5,7 +5,7 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 HOME_DIR="$TMP/home"
 MOCK_BIN="$TMP/mock-bin"
-mkdir -p "$HOME_DIR/bin" "$HOME_DIR/.config/deluge" "$MOCK_BIN"
+mkdir -p "$HOME_DIR/bin" "$HOME_DIR/.config/deluge" "$HOME_DIR/.config/deluge-jerry" "$MOCK_BIN"
 if [ "$(/usr/bin/id -u)" -eq 0 ]; then
     if HOME="$HOME_DIR" bash "$ROOT/install.sh" >/dev/null 2>&1; then
         echo 'installer unexpectedly accepted root'; exit 1
@@ -45,4 +45,29 @@ sed -i 's/^CHECK_INTERVAL="2"$/CHECK_INTERVAL="7"/' "$CFG"
 HOME="$HOME_DIR" XDG_CONFIG_HOME="$HOME_DIR/.config" XDG_DATA_HOME="$HOME_DIR/.local/share" XDG_STATE_HOME="$HOME_DIR/.local/state" PATH="$MOCK_BIN:$PATH" DELUGE_CONSOLE="$HOME_DIR/bin/deluge-console" DELUGE_PYTHON="$(command -v python3)" bash "$ROOT/install.sh" > "$TMP/upgrade.log" 2>&1
 grep -q '^CHECK_INTERVAL="7"$' "$CFG"
 [ -f "$(find "$(dirname "$CFG")" -name 'reannounce.conf.backup.*' -print -quit)" ]
-echo 'rootless installer mock test passed'
+
+cat > "$HOME_DIR/.config/deluge-jerry/core.conf" <<'CORE'
+{
+  "file": 1, "format": 1
+}{
+  "daemon_port": 28602
+}
+CORE
+HOME="$HOME_DIR" XDG_CONFIG_HOME="$HOME_DIR/.config" XDG_DATA_HOME="$HOME_DIR/.local/share" XDG_STATE_HOME="$HOME_DIR/.local/state" PATH="$MOCK_BIN:$PATH" DELUGE_CONSOLE="$HOME_DIR/bin/deluge-console" DELUGE_PYTHON="$(command -v python3)" DELUGE_INSTANCE=jerry DELUGE_CONFIG_DIR="$HOME_DIR/.config/deluge-jerry" bash "$ROOT/install.sh" > "$TMP/jerry-install.log" 2>&1
+JERRY_APP="$HOME_DIR/.local/share/deluge-auto-reannounce-jerry"
+JERRY_CFG="$HOME_DIR/.config/deluge-auto-reannounce-jerry/reannounce.conf"
+[ -x "$JERRY_APP/reannounce-new.sh" ]
+[ -x "$JERRY_APP/execute-reannounce.sh" ]
+[ -x "$HOME_DIR/.local/bin/deluge-reannounce-jerry" ]
+grep -q '^DELUGE_PORT="28602"
+ "$JERRY_CFG"
+grep -q '^DELUGE_CONFIG_DIR=' "$JERRY_CFG"
+grep -q 'deluge-auto-reannounce-jerry/execute-reannounce.sh' "$TMP/jerry-install.log"
+grep -q '^DELUGE_PORT="31851"
+ "$CFG"
+[ -x "$HOME_DIR/.local/bin/deluge-reannounce" ]
+if HOME="$HOME_DIR" XDG_CONFIG_HOME="$HOME_DIR/.config" XDG_DATA_HOME="$HOME_DIR/.local/share" XDG_STATE_HOME="$HOME_DIR/.local/state" PATH="$MOCK_BIN:$PATH" DELUGE_CONSOLE="$HOME_DIR/bin/deluge-console" DELUGE_PYTHON="$(command -v python3)" DELUGE_INSTANCE="../bad" bash "$ROOT/install.sh" >/dev/null 2>&1; then
+    echo "installer unexpectedly accepted invalid instance name"; exit 1
+fi
+
+echo 'rootless multi-instance installer mock test passed'
