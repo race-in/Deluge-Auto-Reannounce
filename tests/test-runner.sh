@@ -125,6 +125,9 @@ fi
 if CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_PORT=58846 MAX_RUNTIME=oops "$RUNNER" "$HASH" >/dev/null 2>&1; then
   echo 'invalid max runtime unexpectedly accepted'; exit 1
 fi
+if CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_PORT=58846 CONSOLE_TIMEOUT=0 "$RUNNER" "$HASH" >/dev/null 2>&1; then
+  echo 'zero console timeout unexpectedly accepted'; exit 1
+fi
 bash -n "$RUNNER" "$ROOT/install.sh" "$ROOT/uninstall.sh" "$ROOT/tests/test-installer.sh"
 python -m py_compile "$ROOT/scripts/configure-execute.py"
 echo 'runner mock tests passed'
