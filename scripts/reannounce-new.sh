@@ -13,6 +13,7 @@ if [ -r "$CONFIG_FILE" ]; then
 fi
 
 DELUGE_CONSOLE=${DELUGE_CONSOLE:-deluge-console}
+DELUGE_CONFIG_DIR=${DELUGE_CONFIG_DIR:-"${HOME:-}/.config/deluge"}
 DELUGE_HOST=${DELUGE_HOST:-127.0.0.1}
 DELUGE_PORT=${DELUGE_PORT:-58846}
 INITIAL_DELAY=${INITIAL_DELAY:-0.5}
@@ -78,7 +79,7 @@ while :; do
     elapsed=$((now - START_TIME))
     [ "$elapsed" -lt "$MAX_RUNTIME" ] || { log "TIMEOUT | ${elapsed}s | Attempts: $ATTEMPT | $TORRENT_NAME"; exit 1; }
 
-    output=$("$DELUGE_CONSOLE" "connect ${DELUGE_HOST}:${DELUGE_PORT}; info -v ${TORRENT_ID}" 2>&1) || true
+    output=$("$DELUGE_CONSOLE" -c "$DELUGE_CONFIG_DIR" "connect ${DELUGE_HOST}:${DELUGE_PORT}; info -v ${TORRENT_ID}" 2>&1) || true
     status=$(printf '%s\n' "$output" | grep -i 'Tracker status:' || true)
     log "CHECK | ${elapsed}s | ${status:-Tracker status unavailable}"
 
@@ -109,7 +110,7 @@ while :; do
         ATTEMPT=$((ATTEMPT + 1))
         LAST_REANNOUNCE=$now
         log "REANNOUNCE $ATTEMPT | ${elapsed}s | $TORRENT_NAME"
-        "$DELUGE_CONSOLE" "connect ${DELUGE_HOST}:${DELUGE_PORT}; reannounce ${TORRENT_ID}" >/dev/null 2>&1 || log "WARNING | reannounce command returned failure"
+        "$DELUGE_CONSOLE" -c "$DELUGE_CONFIG_DIR" "connect ${DELUGE_HOST}:${DELUGE_PORT}; reannounce ${TORRENT_ID}" >/dev/null 2>&1 || log "WARNING | reannounce command returned failure"
     fi
     sleep "$CHECK_INTERVAL"
 done
