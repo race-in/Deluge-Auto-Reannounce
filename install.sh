@@ -100,6 +100,7 @@ else
     sed -i "s|^DELUGE_CONSOLE=.*|DELUGE_CONSOLE=\"$CONSOLE\"|" "$config"
     sed -i "s|^DELUGE_PORT=.*|DELUGE_PORT=\"$PORT\"|" "$config"
     if grep -q '^DELUGE_CONFIG_DIR=' "$config"; then sed -i "s|^DELUGE_CONFIG_DIR=.*|DELUGE_CONFIG_DIR=\"$DELUGE_CONFIG_DIR_RESOLVED\"|" "$config"; else printf '\nDELUGE_CONFIG_DIR="%s"\n' "$DELUGE_CONFIG_DIR_RESOLVED" >> "$config"; fi
+    grep -q '^CONSOLE_TIMEOUT=' "$config" || printf '\nCONSOLE_TIMEOUT="20"\n' >> "$config"
 fi
 chmod 600 "$config"
 
