@@ -17,23 +17,21 @@ host = os.environ.get("DELUGE_HOST", "127.0.0.1")
 
 
 def credentials():
+    # Deluge 1.3 installations can coexist under separate config directories.
+    # Always prefer the explicitly selected instance auth file; the default
+    # Deluge config manager may otherwise return credentials for another daemon.
+    config_dir = os.environ.get("DELUGE_CONFIG_DIR",
+                               os.path.expanduser("~/.config/deluge"))
+    auth_path = os.path.join(config_dir, "auth")
     try:
-        from deluge.ui.common import get_localhost_auth
-        return get_localhost_auth()
-    except Exception:
-        try:
-            import deluge.configmanager
-            auth_path = os.path.join(deluge.configmanager.get_config_dir(), "auth")
-        except Exception:
-            config_dir = os.environ.get("DELUGE_CONFIG_DIR", os.path.expanduser("~/.config/deluge"))
-            auth_path = os.path.join(config_dir, "auth")
         with open(auth_path, "r") as stream:
             for line in stream:
                 fields = line.strip().split(":")
                 if len(fields) >= 2 and fields[0] == "localclient":
                     return fields[0], fields[1]
-        raise RuntimeError("localclient credentials not found in Deluge auth file")
-
+    except IOError:
+        pass
+    raise RuntimeError("localclient credentials not found in selected Deluge auth file: %s" % auth_path)
 
 def stop():
     if reactor.running:
