@@ -87,9 +87,11 @@ run_failure_retry_case() {
     NOW_COMMAND="$CLOCK" INITIAL_DELAY=0 CHECK_INTERVAL=0.001 MAX_RUNTIME=300 \
     REANNOUNCE_INTERVAL=30 SENT_TIMEOUT=3 LOG_FILE="$TMP/log" \
     "$RUNNER" "$HASH" Test >/dev/null 2>&1
-  [ "$(cat "$TMP/pause-attempts")" -ge 2 ] || { echo "$failure: pause was not retried"; exit 1; }
   [ "$(cat "$TMP/resume-attempts")" -ge 1 ] || { echo "$failure: resume was not attempted"; exit 1; }
-  if [ "$failure" = resume ]; then
+  if [ "$failure" = pause ]; then
+    [ "$(cat "$TMP/pause-attempts")" -ge 2 ] || { echo 'pause failure was not retried'; exit 1; }
+  else
+    [ "$(cat "$TMP/pause-attempts")" -eq 1 ] || { echo 'resume failure must not repeat pause'; exit 1; }
     [ "$(cat "$TMP/resume-attempts")" -ge 2 ] || { echo 'resume failure was not retried'; exit 1; }
   fi
   grep -q 'SUCCESS | Announce OK' "$TMP/log"
