@@ -119,7 +119,7 @@ Use the actual home path printed by the installer. Add the command exactly as sh
 | `DELUGE_HOST` | `127.0.0.1` | Local daemon address |
 | `DELUGE_PORT` | detected / `58846` | Deluge daemon port |
 | `INITIAL_DELAY` | `0.5` | Delay after torrent-added event |
-| `CHECK_INTERVAL` | `2` | Tracker status poll interval (seconds) |
+| `CHECK_INTERVAL` | `1` | Tracker status poll interval (seconds) |
 | `REANNOUNCE_INTERVAL` | `15` | Minimum seconds between reannounce requests after no successful response |
 | `SENT_TIMEOUT` | `20` | Wait for an in-flight announce response before retrying |
 | `CONSOLE_TIMEOUT` | `20` | Maximum seconds for one Deluge Console RPC command when GNU `timeout` is available |
