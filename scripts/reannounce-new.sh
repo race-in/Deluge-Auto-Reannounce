@@ -8,7 +8,7 @@ TORRENT_ID=${1:-}
 TORRENT_NAME=${2:-Unknown Torrent}
 DOWNLOAD_PATH=${3:-Unknown}
 
-CONFIG_FILE=${CONFIG_FILE:-"${HOME:-}/.local/share/deluge-auto-reannounce/reannounce.conf"}
+CONFIG_FILE=${CONFIG_FILE:-"${XDG_CONFIG_HOME:-${HOME:-}/.config}/deluge-auto-reannounce/reannounce.conf"}
 if [ -r "$CONFIG_FILE" ]; then
     # shellcheck disable=SC1090
     . "$CONFIG_FILE"
