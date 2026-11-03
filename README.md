@@ -121,7 +121,8 @@ Use the actual home path printed by the installer. Add the command exactly as sh
 | `INITIAL_DELAY` | `0.5` | Delay after torrent-added event |
 | `CHECK_INTERVAL` | `2` | Tracker status poll interval (seconds) |
 | `REANNOUNCE_INTERVAL` | `30` | Minimum seconds between reannounce requests |
-| `SENT_TIMEOUT` | `15` | Wait for in-flight announce response |\n| `CONSOLE_TIMEOUT` | `20` | Maximum seconds for one Deluge Console RPC command when GNU `timeout` is available |
+| `SENT_TIMEOUT` | `15` | Wait for in-flight announce response |
+| `CONSOLE_TIMEOUT` | `20` | Maximum seconds for one Deluge Console RPC command when GNU `timeout` is available |
 | `MAX_RUNTIME` | `300` | Maximum run time (seconds) |
 
 Edit:
