@@ -42,6 +42,7 @@ elif [[ "$*" == *"pause $MOCK_HASH" ]]; then
   fi
   if [ "${MOCK_IGNORE_PAUSE:-0}" != 1 ]; then
     printf '%s\n' Paused > "$MOCK_TORRENT_STATE_FILE"
+    : > "$MOCK_PAUSED_MARKER"
     echo pause >> "$MOCK_ACTIONS"
   fi
 elif [[ "$*" == *"resume $MOCK_HASH" ]]; then
