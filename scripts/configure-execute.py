@@ -69,3 +69,4 @@ sys.exit_code = 1
 reactor.callWhenRunning(main)
 reactor.callLater(25, lambda: (print("Deluge RPC timeout", file=sys.stderr), stop()))
 reactor.run()
+sys.exit(sys.exit_code)
