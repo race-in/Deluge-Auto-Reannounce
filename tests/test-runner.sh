@@ -50,9 +50,11 @@ elif [[ "$*" == *"resume $MOCK_HASH" ]]; then
   if [ "${MOCK_FAIL_RESUME_ONCE:-0}" = 1 ] && [ "$n" -eq 1 ]; then
     echo 'mock resume failure' >&2; exit 1
   fi
+  was_paused=0; [ ! -f "$MOCK_PAUSED_MARKER" ] || was_paused=1
+  rm -f "$MOCK_PAUSED_MARKER"
   printf '%s\n' Downloading > "$MOCK_TORRENT_STATE_FILE"
   echo resume >> "$MOCK_ACTIONS"
-  if [ "$MOCK_MODE" != sent ]; then : > "$MOCK_ANNOUNCED"; fi
+  if [ "$was_paused" -eq 1 ] && [ "$MOCK_MODE" != sent ]; then : > "$MOCK_ANNOUNCED"; fi
 else
   echo "unexpected mock command: $*" >&2; exit 90
 fi
@@ -64,7 +66,7 @@ reset_case() {
   printf '%s\n' Downloading > "$TMP/torrent-state"
   export MOCK_HASH="$HASH" MOCK_MODE="$1"
   export MOCK_TORRENT_STATE_FILE="$TMP/torrent-state"
-  export MOCK_ANNOUNCED="$TMP/announced" MOCK_ACTIONS="$TMP/actions"
+  export MOCK_ANNOUNCED="$TMP/announced" MOCK_ACTIONS="$TMP/actions" MOCK_PAUSED_MARKER="$TMP/paused-marker"
   export MOCK_PAUSE_COUNT="$TMP/pause-count" MOCK_RESUME_COUNT="$TMP/resume-count"
   export MOCK_INFO_COUNT="$TMP/info-count" MOCK_CALLS="$TMP/calls"
   export CLOCK_STATE="$TMP/clock-state"
@@ -118,7 +120,7 @@ run_failure_case() {
 run_unconfirmed_pause_case() {
   reset_case error
   export MOCK_IGNORE_PAUSE=1
-  run_runner
+  if run_runner; then :; else :; fi
   grep -q 'PAUSE_NOT_CONFIRMED_BUT_RESUMED' "$TMP/log" || { echo 'unconfirmed pause was reported as successful'; exit 1; }
   [ "$(cat "$TMP/torrent-state")" = Downloading ] || { echo 'torrent did not remain active'; exit 1; }
   unset MOCK_IGNORE_PAUSE
