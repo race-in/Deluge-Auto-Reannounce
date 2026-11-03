@@ -131,7 +131,7 @@ Edit:
 nano ~/.config/deluge-auto-reannounce/reannounce.conf
 ```
 
-Changes apply to subsequent torrents; no Deluge restart is needed. The defaults allow up to 15 minutes for slower trackers, check status every 2 seconds, wait up to 20 seconds for an in-flight response, and retry a non-successful announce every 15 seconds. Tracker announce rules still apply: use a shorter retry interval only where the tracker permits it.
+Changes apply to subsequent torrents; no Deluge restart is needed. The defaults allow up to 15 minutes for slower trackers, check status every 1 second, wait up to 20 seconds for an in-flight response, and retry a non-successful announce every 15 seconds. Tracker announce rules still apply: use a shorter retry interval only where the tracker permits it.
 
 ## Status decisions
 
