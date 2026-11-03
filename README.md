@@ -43,6 +43,30 @@ bash install.sh
 
 Do **not** use `sudo`. The installer refuses to run as root.
 
+
+### Multiple Deluge instances on one slot
+
+Each instance must use its own `DELUGE_INSTANCE` name, console, Python interpreter, config directory and daemon port. The default install keeps the original paths. Named instances use isolated data/config/state directories and their own manual shortcut.
+
+Install the Standard instance:
+
+```bash
+bash install.sh
+```
+
+Install Jerry separately (using the paths confirmed on your slot):
+
+```bash
+DELUGE_INSTANCE=jerry \\
+DELUGE_CONSOLE="$HOME/.local/opt/deluge-1.3.15-jerry/bin/deluge-console" \\
+DELUGE_PYTHON="$HOME/.local/opt/deluge-1.3.15-jerry/bin/python2.7" \\
+DELUGE_CONFIG_DIR="$HOME/.config/deluge-jerry" \\
+DELUGE_PORT=28602 \\
+bash install.sh
+```
+
+The Jerry instance uses `deluge-auto-reannounce-jerry` data/config/state directories and `~/.local/bin/deluge-reannounce-jerry`. The runner and manual command always pass that instance's `-c` config directory to `deluge-console`; RPC registration reads `localclient` credentials from that same directory. This prevents accidentally using Standard Deluge's auth/config. Re-run with the same `DELUGE_INSTANCE` and overrides to upgrade that instance. Remove only Jerry with `DELUGE_INSTANCE=jerry bash uninstall.sh`.
+
 ### Optional overrides
 
 ```bash
