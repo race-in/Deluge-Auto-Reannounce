@@ -87,7 +87,7 @@ DELUGE_CONFIG_DIR="$DELUGE_CONFIG_DIR_RESOLVED"
 DELUGE_HOST="${DELUGE_HOST:-127.0.0.1}"
 DELUGE_PORT="$PORT"
 INITIAL_DELAY="${INITIAL_DELAY:-0.5}"
-CHECK_INTERVAL="${CHECK_INTERVAL:-2}"
+CHECK_INTERVAL="${CHECK_INTERVAL:-1}"
 MAX_RUNTIME="${MAX_RUNTIME:-900}"
 REANNOUNCE_INTERVAL="${REANNOUNCE_INTERVAL:-15}"
 SENT_TIMEOUT="${SENT_TIMEOUT:-20}"
@@ -102,6 +102,7 @@ else
     if grep -q '^DELUGE_CONFIG_DIR=' "$config"; then sed -i "s|^DELUGE_CONFIG_DIR=.*|DELUGE_CONFIG_DIR=\"$DELUGE_CONFIG_DIR_RESOLVED\"|" "$config"; else printf '\nDELUGE_CONFIG_DIR="%s"\n' "$DELUGE_CONFIG_DIR_RESOLVED" >> "$config"; fi
     # Migrate only untouched project defaults; preserve any user-customized values.
     sed -i 's/^MAX_RUNTIME="300"$/MAX_RUNTIME="900"/' "$config"
+    sed -i 's/^CHECK_INTERVAL="2"$/CHECK_INTERVAL="1"/' "$config"
     sed -i 's/^REANNOUNCE_INTERVAL="30"$/REANNOUNCE_INTERVAL="15"/' "$config"
     sed -i 's/^SENT_TIMEOUT="15"$/SENT_TIMEOUT="20"/' "$config"
     grep -q '^CONSOLE_TIMEOUT=' "$config" || printf '\nCONSOLE_TIMEOUT="20"\n' >> "$config"
