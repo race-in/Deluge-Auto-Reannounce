@@ -6,193 +6,139 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 FAKE="$TMP/fake-deluge-console"
 CLOCK="$TMP/fake-clock"
+HASH=0123456789abcdef0123456789abcdef01234567
+
 cat > "$CLOCK" <<'CLOCK'
 #!/usr/bin/env bash
-n=0; [ ! -f "$CLOCK_STATE" ] || n=$(cat "$CLOCK_STATE")
-n=$((n + 1)); printf '%s' "$n" > "$CLOCK_STATE"; printf '%s\n' "$n"
+n=0
+[ ! -f "$CLOCK_STATE" ] || n=$(cat "$CLOCK_STATE")
+n=$((n + 1))
+printf '%s\n' "$n" > "$CLOCK_STATE"
+printf '%s\n' "$n"
 CLOCK
 cat > "$FAKE" <<'MOCK'
 #!/usr/bin/env bash
 set -eu
 printf '%s\n' "$*" >> "$MOCK_CALLS"
-case "$*" in
-  *"info -v"*)
-    n=0; [ ! -f "$MOCK_STATE" ] || n=$(cat "$MOCK_STATE")
-    n=$((n + 1)); printf '%s' "$n" > "$MOCK_STATE"
-    echo "State: ${MOCK_TORRENT_STATE:-Downloading}"
-    if [ -f "$MOCK_ANNOUNCES" ]; then
-      echo 'Tracker status: mock: Announce OK'
-    else
-      case "$MOCK_MODE:$n" in
-        ok:*) echo 'Tracker status: mock: Announce OK';;
-        delayed:1) echo 'Tracker status: mock: Announce Sent';;
-        delayed:*) echo 'Tracker status: mock: Announce OK';;
-        sent:*) echo 'Tracker status: mock: Announce Sent';;
-        *) echo 'Tracker status: mock: Tracker Error';;
-      esac
-    fi
-    ;;
-  *"pause "*)
-    n=0; [ ! -f "$MOCK_PAUSE_ATTEMPTS" ] || n=$(cat "$MOCK_PAUSE_ATTEMPTS")
-    n=$((n + 1)); printf '%s' "$n" > "$MOCK_PAUSE_ATTEMPTS"
-    if [ "${MOCK_FAIL_PAUSE_ONCE:-0}" = 1 ] && [ "$n" -eq 1 ]; then
-      echo 'mock pause failure' >&2
-      exit 1
-    fi
+if [[ "$*" == *"info -v "* ]]; then
+  n=0; [ ! -f "$MOCK_INFO_COUNT" ] || n=$(cat "$MOCK_INFO_COUNT")
+  n=$((n + 1)); printf '%s\n' "$n" > "$MOCK_INFO_COUNT"
+  state=$(cat "$MOCK_TORRENT_STATE_FILE")
+  echo "State: $state"
+  if [ -f "$MOCK_ANNOUNCED" ] || [ "$MOCK_MODE" = ok ] || { [ "$MOCK_MODE" = delayed ] && [ "$n" -ge 2 ]; }; then
+    echo 'Tracker status: mock: Announce OK'
+  elif [ "$MOCK_MODE" = sent ]; then
+    echo 'Tracker status: mock: Announce Sent'
+  elif [ "$MOCK_MODE" = delayed ]; then
+    echo 'Tracker status: mock: Announce Sent'
+  else
+    echo 'Tracker status: mock: Tracker Error'
+  fi
+elif [[ "$*" == *"pause $MOCK_HASH" ]]; then
+  n=0; [ ! -f "$MOCK_PAUSE_COUNT" ] || n=$(cat "$MOCK_PAUSE_COUNT")
+  n=$((n + 1)); printf '%s\n' "$n" > "$MOCK_PAUSE_COUNT"
+  if [ "${MOCK_FAIL_PAUSE_ONCE:-0}" = 1 ] && [ "$n" -eq 1 ]; then
+    echo 'mock pause failure' >&2; exit 1
+  fi
+  if [ "${MOCK_IGNORE_PAUSE:-0}" != 1 ]; then
+    printf '%s\n' Paused > "$MOCK_TORRENT_STATE_FILE"
     echo pause >> "$MOCK_ACTIONS"
-    ;;
-  *"resume "*)
-    n=0; [ ! -f "$MOCK_RESUME_ATTEMPTS" ] || n=$(cat "$MOCK_RESUME_ATTEMPTS")
-    n=$((n + 1)); printf '%s' "$n" > "$MOCK_RESUME_ATTEMPTS"
-    if [ "${MOCK_FAIL_RESUME_ONCE:-0}" = 1 ] && [ "$n" -eq 1 ]; then
-      echo 'mock resume failure' >&2
-      exit 1
-    fi
-    echo resume >> "$MOCK_ACTIONS"
-    if grep -q '^pause
-    ;;
-esac
+  fi
+elif [[ "$*" == *"resume $MOCK_HASH" ]]; then
+  n=0; [ ! -f "$MOCK_RESUME_COUNT" ] || n=$(cat "$MOCK_RESUME_COUNT")
+  n=$((n + 1)); printf '%s\n' "$n" > "$MOCK_RESUME_COUNT"
+  if [ "${MOCK_FAIL_RESUME_ONCE:-0}" = 1 ] && [ "$n" -eq 1 ]; then
+    echo 'mock resume failure' >&2; exit 1
+  fi
+  printf '%s\n' Downloading > "$MOCK_TORRENT_STATE_FILE"
+  echo resume >> "$MOCK_ACTIONS"
+  if [ "$MOCK_MODE" != sent ]; then : > "$MOCK_ANNOUNCED"; fi
+else
+  echo "unexpected mock command: $*" >&2; exit 90
+fi
 MOCK
 chmod +x "$FAKE" "$CLOCK"
-HASH=0123456789abcdef0123456789abcdef01234567
+
+reset_case() {
+  rm -f "$TMP"/*
+  printf '%s\n' Downloading > "$TMP/torrent-state"
+  export MOCK_HASH="$HASH" MOCK_MODE="$1"
+  export MOCK_TORRENT_STATE_FILE="$TMP/torrent-state"
+  export MOCK_ANNOUNCED="$TMP/announced" MOCK_ACTIONS="$TMP/actions"
+  export MOCK_PAUSE_COUNT="$TMP/pause-count" MOCK_RESUME_COUNT="$TMP/resume-count"
+  export MOCK_INFO_COUNT="$TMP/info-count" MOCK_CALLS="$TMP/calls"
+  export CLOCK_STATE="$TMP/clock-state"
+}
+run_runner() {
+  CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_CONFIG_DIR="$TMP/deluge-config" \
+    DELUGE_PORT=58846 NOW_COMMAND="$CLOCK" INITIAL_DELAY=0 CHECK_INTERVAL=0.001 \
+    MAX_RUNTIME=300 REANNOUNCE_INTERVAL=30 SENT_TIMEOUT=3 LOG_FILE="$TMP/log" \
+    "$RUNNER" "$HASH" Test >/dev/null 2>&1
+}
+assert_no_direct_reannounce() {
+  if grep -qE '(^|;[[:space:]]*)reannounce[[:space:]]' "$TMP/calls"; then
+    echo 'runner invoked direct reannounce'; exit 1
+  fi
+}
 run_case() {
   mode=$1; expected=$2
-  rm -f "$TMP/state" "$TMP/actions" "$TMP/announces" "$TMP/log" "$TMP/clock-state" "$TMP/pause-attempts" "$TMP/resume-attempts"
-  export MOCK_STATE="$TMP/state" MOCK_MODE="$mode" MOCK_ACTIONS="$TMP/actions" MOCK_ANNOUNCES="$TMP/announces"
-  export MOCK_PAUSE_ATTEMPTS="$TMP/pause-attempts" MOCK_RESUME_ATTEMPTS="$TMP/resume-attempts"
-  export CLOCK_STATE="$TMP/clock-state" MOCK_CALLS="$TMP/calls"
-  CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_CONFIG_DIR="$TMP/jerry-config" DELUGE_PORT=58846 \
-    NOW_COMMAND="$CLOCK" INITIAL_DELAY=0 CHECK_INTERVAL=0.001 MAX_RUNTIME=300 \
-    REANNOUNCE_INTERVAL=30 SENT_TIMEOUT=3 LOG_FILE="$TMP/log" \
-    "$RUNNER" "$HASH" Test >/dev/null 2>&1
+  reset_case "$mode"
+  run_runner
   count=0; [ ! -f "$TMP/actions" ] || count=$(wc -l < "$TMP/actions")
-  [ "$count" -eq "$((expected * 2))" ] || { echo "$mode: expected $((expected * 2)) pause/resume actions, got $count"; exit 1; }
+  [ "$count" -eq "$((expected * 2))" ] || { echo "$mode: expected $((expected * 2)) actions, got $count"; exit 1; }
   if [ "$expected" -gt 0 ]; then
-    if [ "$(sed -n '1p' "$TMP/actions")" != pause ] || [ "$(sed -n '2p' "$TMP/actions")" != resume ]; then
-      echo "$mode: pause/resume order incorrect"
-      exit 1
-    fi
+    [ "$(sed -n '1p' "$TMP/actions")" = pause ] || { echo "$mode: pause was not first"; exit 1; }
+    [ "$(sed -n '2p' "$TMP/actions")" = resume ] || { echo "$mode: resume was not second"; exit 1; }
   fi
-  ! grep -q "reannounce " "$TMP/calls" || { echo "$mode: direct reannounce must not be called"; exit 1; }
-  grep -F -- "-c $TMP/jerry-config connect 127.0.0.1:58846;" "$TMP/calls" >/dev/null
+  grep -F -- "-c $TMP/deluge-config connect 127.0.0.1:58846;" "$TMP/calls" >/dev/null
+  assert_no_direct_reannounce
 }
-run_failure_retry_case() {
+run_paused_case() {
+  reset_case error
+  printf '%s\n' Paused > "$MOCK_TORRENT_STATE_FILE"
+  run_runner
+  [ ! -s "$TMP/actions" ] || { echo 'paused torrent was modified'; exit 1; }
+  grep -q 'SKIPPED | Torrent was already paused' "$TMP/log"
+}
+run_failure_case() {
   failure=$1
-  rm -f "$TMP/state" "$TMP/actions" "$TMP/announces" "$TMP/log" "$TMP/clock-state" "$TMP/pause-attempts" "$TMP/resume-attempts"
-  export MOCK_STATE="$TMP/state" MOCK_MODE=error MOCK_ACTIONS="$TMP/actions" MOCK_ANNOUNCES="$TMP/announces"
-  export MOCK_PAUSE_ATTEMPTS="$TMP/pause-attempts" MOCK_RESUME_ATTEMPTS="$TMP/resume-attempts"
-  export CLOCK_STATE="$TMP/clock-state" MOCK_CALLS="$TMP/calls"
-  unset MOCK_FAIL_PAUSE_ONCE MOCK_FAIL_RESUME_ONCE
-  if [ "$failure" = pause ]; then MOCK_FAIL_PAUSE_ONCE=1; export MOCK_FAIL_PAUSE_ONCE; else MOCK_FAIL_RESUME_ONCE=1; export MOCK_FAIL_RESUME_ONCE; fi
-  CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_CONFIG_DIR="$TMP/jerry-config" DELUGE_PORT=58846 \
-    NOW_COMMAND="$CLOCK" INITIAL_DELAY=0 CHECK_INTERVAL=0.001 MAX_RUNTIME=300 \
-    REANNOUNCE_INTERVAL=30 SENT_TIMEOUT=3 LOG_FILE="$TMP/log" \
-    "$RUNNER" "$HASH" Test >/dev/null 2>&1
-  [ "$(cat "$TMP/resume-attempts")" -ge 1 ] || { echo "$failure: resume was not attempted"; exit 1; }
+  reset_case error
+  if [ "$failure" = pause ]; then export MOCK_FAIL_PAUSE_ONCE=1; else export MOCK_FAIL_RESUME_ONCE=1; fi
+  run_runner
+  [ -s "$TMP/resume-count" ] || { echo "$failure: resume was not attempted"; exit 1; }
   if [ "$failure" = pause ]; then
-    [ "$(cat "$TMP/pause-attempts")" -ge 2 ] || { echo 'pause failure was not retried'; exit 1; }
+    [ "$(cat "$TMP/pause-count")" -ge 2 ] || { echo 'pause failure was not retried'; exit 1; }
   else
-    [ "$(cat "$TMP/pause-attempts")" -eq 1 ] || { echo 'resume failure must not repeat pause'; exit 1; }
-    [ "$(cat "$TMP/resume-attempts")" -ge 2 ] || { echo 'resume failure was not retried'; exit 1; }
+    [ "$(cat "$TMP/pause-count")" -eq 1 ] || { echo 'pause repeated while recovering resume'; exit 1; }
+    [ "$(cat "$TMP/resume-count")" -ge 2 ] || { echo 'resume recovery was not retried'; exit 1; }
   fi
   grep -q 'SUCCESS | Announce OK' "$TMP/log"
   unset MOCK_FAIL_PAUSE_ONCE MOCK_FAIL_RESUME_ONCE
 }
-run_paused_case() {
-  rm -f "$TMP/state" "$TMP/actions" "$TMP/announces" "$TMP/log" "$TMP/clock-state" "$TMP/pause-attempts" "$TMP/resume-attempts"
-  export MOCK_STATE="$TMP/state" MOCK_MODE=error MOCK_ACTIONS="$TMP/actions" MOCK_ANNOUNCES="$TMP/announces"
-  export MOCK_PAUSE_ATTEMPTS="$TMP/pause-attempts" MOCK_RESUME_ATTEMPTS="$TMP/resume-attempts"
-  export CLOCK_STATE="$TMP/clock-state" MOCK_CALLS="$TMP/calls" MOCK_TORRENT_STATE=Paused
-  CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_CONFIG_DIR="$TMP/jerry-config" DELUGE_PORT=58846 \
-    NOW_COMMAND="$CLOCK" INITIAL_DELAY=0 CHECK_INTERVAL=0.001 MAX_RUNTIME=300 \
-    REANNOUNCE_INTERVAL=30 SENT_TIMEOUT=3 LOG_FILE="$TMP/log" \
-    "$RUNNER" "$HASH" Test >/dev/null 2>&1
-  [ ! -s "$TMP/actions" ] || { echo 'paused torrent was modified'; exit 1; }
-  grep -q 'SKIPPED | Torrent was already paused' "$TMP/log"
-  unset MOCK_TORRENT_STATE
+run_unconfirmed_pause_case() {
+  reset_case error
+  export MOCK_IGNORE_PAUSE=1
+  run_runner
+  grep -q 'PAUSE_NOT_CONFIRMED_BUT_RESUMED' "$TMP/log" || { echo 'unconfirmed pause was reported as successful'; exit 1; }
+  [ "$(cat "$TMP/torrent-state")" = Downloading ] || { echo 'torrent did not remain active'; exit 1; }
+  unset MOCK_IGNORE_PAUSE
 }
+
 run_case ok 0
 run_case delayed 0
 run_case sent 1
 run_case error 1
 run_paused_case
-run_failure_retry_case pause
-run_failure_retry_case resume
+run_failure_case pause
+run_failure_case resume
+run_unconfirmed_pause_case
+
 if "$RUNNER" bad >/dev/null 2>&1; then echo 'invalid hash unexpectedly accepted'; exit 1; fi
-if CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_PORT=58846 CHECK_INTERVAL=oops "$RUNNER" "$HASH" >/dev/null 2>&1; then
-  echo 'invalid check interval unexpectedly accepted'; exit 1
-fi
-if CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_PORT=58846 MAX_RUNTIME=oops "$RUNNER" "$HASH" >/dev/null 2>&1; then
-  echo 'invalid max runtime unexpectedly accepted'; exit 1
-fi
-if CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_PORT=58846 CONSOLE_TIMEOUT=0 "$RUNNER" "$HASH" >/dev/null 2>&1; then
-  echo 'zero console timeout unexpectedly accepted'; exit 1
-fi
-bash -n "$RUNNER" "$ROOT/install.sh" "$ROOT/uninstall.sh" "$ROOT/tests/test-installer.sh"
-python -m py_compile "$ROOT/scripts/configure-execute.py"
-echo 'runner mock tests passed'
- "$MOCK_ACTIONS"; then : > "$MOCK_ANNOUNCES"; fi
-    ;;
-esac
-MOCK
-chmod +x "$FAKE" "$CLOCK"
-HASH=0123456789abcdef0123456789abcdef01234567
-run_case() {
-  mode=$1; expected=$2
-  rm -f "$TMP/state" "$TMP/actions" "$TMP/announces" "$TMP/log" "$TMP/clock-state" "$TMP/pause-attempts" "$TMP/resume-attempts"
-  export MOCK_STATE="$TMP/state" MOCK_MODE="$mode" MOCK_ACTIONS="$TMP/actions" MOCK_ANNOUNCES="$TMP/announces"
-  export MOCK_PAUSE_ATTEMPTS="$TMP/pause-attempts" MOCK_RESUME_ATTEMPTS="$TMP/resume-attempts"
-  export CLOCK_STATE="$TMP/clock-state" MOCK_CALLS="$TMP/calls"
-  CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_CONFIG_DIR="$TMP/jerry-config" DELUGE_PORT=58846 \
-    NOW_COMMAND="$CLOCK" INITIAL_DELAY=0 CHECK_INTERVAL=0.001 MAX_RUNTIME=300 \
-    REANNOUNCE_INTERVAL=30 SENT_TIMEOUT=3 LOG_FILE="$TMP/log" \
-    "$RUNNER" "$HASH" Test >/dev/null 2>&1
-  count=0; [ ! -f "$TMP/actions" ] || count=$(wc -l < "$TMP/actions")
-  [ "$count" -eq "$((expected * 2))" ] || { echo "$mode: expected $((expected * 2)) pause/resume actions, got $count"; exit 1; }
-  if [ "$expected" -gt 0 ]; then
-    if [ "$(sed -n '1p' "$TMP/actions")" != pause ] || [ "$(sed -n '2p' "$TMP/actions")" != resume ]; then
-      echo "$mode: pause/resume order incorrect"
-      exit 1
-    fi
+for setting in 'CHECK_INTERVAL=oops' 'MAX_RUNTIME=oops' 'CONSOLE_TIMEOUT=0' 'DELUGE_PORT=65536'; do
+  if env CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" $setting "$RUNNER" "$HASH" >/dev/null 2>&1; then
+    echo "invalid setting unexpectedly accepted: $setting"; exit 1
   fi
-  ! grep -q "reannounce " "$TMP/calls" || { echo "$mode: direct reannounce must not be called"; exit 1; }
-  grep -F -- "-c $TMP/jerry-config connect 127.0.0.1:58846;" "$TMP/calls" >/dev/null
-}
-run_failure_retry_case() {
-  failure=$1
-  rm -f "$TMP/state" "$TMP/actions" "$TMP/announces" "$TMP/log" "$TMP/clock-state" "$TMP/pause-attempts" "$TMP/resume-attempts"
-  export MOCK_STATE="$TMP/state" MOCK_MODE=error MOCK_ACTIONS="$TMP/actions" MOCK_ANNOUNCES="$TMP/announces"
-  export MOCK_PAUSE_ATTEMPTS="$TMP/pause-attempts" MOCK_RESUME_ATTEMPTS="$TMP/resume-attempts"
-  export CLOCK_STATE="$TMP/clock-state" MOCK_CALLS="$TMP/calls"
-  unset MOCK_FAIL_PAUSE_ONCE MOCK_FAIL_RESUME_ONCE
-  if [ "$failure" = pause ]; then MOCK_FAIL_PAUSE_ONCE=1; export MOCK_FAIL_PAUSE_ONCE; else MOCK_FAIL_RESUME_ONCE=1; export MOCK_FAIL_RESUME_ONCE; fi
-  CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_CONFIG_DIR="$TMP/jerry-config" DELUGE_PORT=58846 \
-    NOW_COMMAND="$CLOCK" INITIAL_DELAY=0 CHECK_INTERVAL=0.001 MAX_RUNTIME=300 \
-    REANNOUNCE_INTERVAL=30 SENT_TIMEOUT=3 LOG_FILE="$TMP/log" \
-    "$RUNNER" "$HASH" Test >/dev/null 2>&1
-  [ "$(cat "$TMP/resume-attempts")" -ge 1 ] || { echo "$failure: resume was not attempted"; exit 1; }
-  if [ "$failure" = pause ]; then
-    [ "$(cat "$TMP/pause-attempts")" -ge 2 ] || { echo 'pause failure was not retried'; exit 1; }
-  else
-    [ "$(cat "$TMP/pause-attempts")" -eq 1 ] || { echo 'resume failure must not repeat pause'; exit 1; }
-    [ "$(cat "$TMP/resume-attempts")" -ge 2 ] || { echo 'resume failure was not retried'; exit 1; }
-  fi
-  grep -q 'SUCCESS | Announce OK' "$TMP/log"
-  unset MOCK_FAIL_PAUSE_ONCE MOCK_FAIL_RESUME_ONCE
-}
-run_case ok 0
-run_case delayed 0
-run_case sent 1
-run_case error 1
-run_failure_retry_case pause
-run_failure_retry_case resume
-if "$RUNNER" bad >/dev/null 2>&1; then echo 'invalid hash unexpectedly accepted'; exit 1; fi
-if CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_PORT=58846 CHECK_INTERVAL=oops "$RUNNER" "$HASH" >/dev/null 2>&1; then
-  echo 'invalid check interval unexpectedly accepted'; exit 1
-fi
-if CONFIG_FILE="$TMP/no-config" DELUGE_CONSOLE="$FAKE" DELUGE_PORT=58846 MAX_RUNTIME=oops "$RUNNER" "$HASH" >/dev/null 2>&1; then
-  echo 'invalid max runtime unexpectedly accepted'; exit 1
-fi
+done
 bash -n "$RUNNER" "$ROOT/install.sh" "$ROOT/uninstall.sh" "$ROOT/tests/test-installer.sh"
 python -m py_compile "$ROOT/scripts/configure-execute.py"
 echo 'runner mock tests passed'
