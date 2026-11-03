@@ -32,7 +32,7 @@ case "$*" in
     fi
     ;;
   *"pause "*) echo pause >> "$MOCK_ACTIONS";;
-  *"resume "*) echo resume >> "$MOCK_ACTIONS";;
+  *"resume "*) echo resume >> "$MOCK_ACTIONS"; : > "$MOCK_ANNOUNCES";;
 esac
 MOCK
 chmod +x "$FAKE" "$CLOCK"
