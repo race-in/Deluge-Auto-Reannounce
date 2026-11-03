@@ -18,7 +18,7 @@ DELUGE_HOST=${DELUGE_HOST:-127.0.0.1}
 DELUGE_PORT=${DELUGE_PORT:-58846}
 INITIAL_DELAY=${INITIAL_DELAY:-0.5}
 CHECK_INTERVAL=${CHECK_INTERVAL:-2}
-MAX_RUNTIME=${MAX_RUNTIME:-300}
+MAX_RUNTIME=${MAX_RUNTIME:-0}
 REANNOUNCE_INTERVAL=${REANNOUNCE_INTERVAL:-30}
 SENT_TIMEOUT=${SENT_TIMEOUT:-15}
 LOG_FILE=${LOG_FILE:-"${HOME:-/tmp}/.local/state/deluge-auto-reannounce/reannounce.log"}
@@ -42,7 +42,7 @@ esac
 [ "${#TORRENT_ID}" -eq 40 ] || fail "Torrent hash must be 40 hexadecimal characters"
 
 is_uint() { case "$1" in ''|*[!0-9]*) return 1;; *) return 0;; esac; }
-for key in DELUGE_PORT MAX_RUNTIME REANNOUNCE_INTERVAL SENT_TIMEOUT; do
+for key in DELUGE_PORT REANNOUNCE_INTERVAL SENT_TIMEOUT; do
     case "$key" in
         DELUGE_PORT) value=$DELUGE_PORT ;;
         MAX_RUNTIME) value=$MAX_RUNTIME ;;
@@ -61,8 +61,8 @@ done
 if [ "$DELUGE_PORT" -lt 1 ] || [ "$DELUGE_PORT" -gt 65535 ]; then
     fail "DELUGE_PORT out of range"
 fi
-if [ "$MAX_RUNTIME" -eq 0 ] || [ "$CHECK_INTERVAL" = "0" ] || [ "$CHECK_INTERVAL" = "0.0" ]; then
-    fail "MAX_RUNTIME and CHECK_INTERVAL must be positive"
+if [ "$CHECK_INTERVAL" = "0" ] || [ "$CHECK_INTERVAL" = "0.0" ]; then
+    fail "CHECK_INTERVAL must be positive"
 fi
 command -v "$DELUGE_CONSOLE" >/dev/null 2>&1 || [ -x "$DELUGE_CONSOLE" ] || fail "deluge-console not found: $DELUGE_CONSOLE"
 
@@ -77,8 +77,6 @@ ATTEMPT=0
 while :; do
     now=$(now_seconds)
     elapsed=$((now - START_TIME))
-    [ "$elapsed" -lt "$MAX_RUNTIME" ] || { log "TIMEOUT | ${elapsed}s | Attempts: $ATTEMPT | $TORRENT_NAME"; exit 1; }
-
     output=$("$DELUGE_CONSOLE" -c "$DELUGE_CONFIG_DIR" "connect ${DELUGE_HOST}:${DELUGE_PORT}; info -v ${TORRENT_ID}" 2>&1) || true
     status=$(printf '%s\n' "$output" | grep -i 'Tracker status:' || true)
     log "CHECK | ${elapsed}s | ${status:-Tracker status unavailable}"
